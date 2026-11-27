@@ -874,7 +874,7 @@
         cameraMode: 'cockpit', gamepadUiTimer: 0, gamepadButtonsDown: {},
         invertY: false, gyroEnabled: false, gyroBaseBeta: null, gyroBaseGamma: null,
         isPaused: false, isLayoutEditing: false, selectedWidgetId: 'joyZone',
-        phase: 'MENU', simSpeed: 1, autopilot: false, apPhase: 'OFF', cruiseAltM: 1200,
+        phase: 'MENU', simSpeed: 1, autopilot: false, apPhase: 'OFF', apDisconnectReason: '', apTerrainUnsafeTimer: 0, apTerrainWarningShown: false, cruiseAltM: 1200,
         fuelPct: 100, fuelMaxRangeKm: 95.6, fuelRemainingKm: 95.6, fuelEmptyNotified: false,
         boardingProgress: 0, boardingDuration: 12,
         pos: new THREE.Vector3(0, 0.48, 0), heading: 50 * Math.PI / 180, pitch: 0, roll: 0,
@@ -1613,15 +1613,20 @@
         }
       }
 
+      function disconnectAutopilot(reason, message) {
+        if (!state.autopilot) return;
+        state.autopilot = false; state.apPhase = 'OFF'; state.apDisconnectReason = reason;
+        state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
+        state.apTerrainUnsafeTimer = 0; state.apTerrainWarningShown = false;
+        const btn = document.getElementById('btnAutopilot');
+        btn.className = 'btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-300 cursor-pointer';
+        btn.textContent = '🤖 AP 關';
+        SoundEngine.playApDisconnect();
+        if (message) showNavToast(`⚠️ ${message}（解除原因：${reason}）`);
+      }
+
       function triggerEngineFlameoutDive(isBirdStrike) {
-        if (state.autopilot) {
-          state.autopilot = false;
-          state.apPhase = 'OFF';
-          const btn = document.getElementById('btnAutopilot');
-          btn.className = 'btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-300 cursor-pointer';
-          btn.textContent = '🤖 AP 關';
-          SoundEngine.playApDisconnect();
-        }
+        disconnectAutopilot(isBirdStrike ? '鳥擊造成引擎失效' : '引擎失效', '飛機失去安全控制條件，自動駕駛已解除，請接管。');
         state.unpoweredDive = true;
         state.diveRecoveryHold = 0;
         state.diveTimer = isBirdStrike ? 5.0 : 3.2;
@@ -2141,7 +2146,7 @@
         state.onGround = true; state.liftoffGraceTimer = 0; state.groundSpeedKts = 0; state.windClockSec = 0;
         state.windDirectionDeg = Math.random() * 360; state.windSpeedKts = 4 + Math.random() * 12; state.windGustKts = 1 + Math.random() * 5; state.windPhase = Math.random() * Math.PI * 2;
         updateWindControlsUI();
-        state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
+        state.autopilot = false; state.apPhase = 'OFF'; state.apDisconnectReason = ''; state.apTerrainUnsafeTimer = 0; state.apTerrainWarningShown = false; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
         state.unpoweredDive = false; state.diveRecoveryHold = 0; state.diveTimer = 0;
         state.birdStruck = false; state.inStormCell = false; state.windShearCooldown = 0; state.autoTimeCycleTimer = 0; state.lastAnnouncedKmBracket = 9999; state.keys = {};
 
@@ -2523,19 +2528,27 @@
               state.apTerrainPlan = planAutopilotTerrain(arrAp.x, arrAp.z, altM, spec);
             }
             if (state.apTerrainPlan && !state.apTerrainPlan.safe) {
-              state.autopilot = false; state.apPhase = 'OFF'; state.apTerrainStatus = 'UNSAFE'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
-              document.getElementById('btnAutopilot').textContent = '🤖 AP 關';
-              document.getElementById('btnAutopilot').className = 'btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-300 cursor-pointer';
-              showNavToast('⚠️ 航線前方地形無安全繞行或爬升路徑；自動駕駛已中止，請立即接管。');
-              SoundEngine.playApDisconnect();
-            } else if (state.apTerrainPlan?.status === 'AVOID') {
-              state.apTerrainStatus = 'AVOID';
-              if (state.autoLandRequested) {
-                state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
-                state.apPhase = 'CLIMB';
-                showNavToast('⚠️ 進場路徑有地形風險，已取消自動降落並先繞開地形。');
+              state.apTerrainUnsafeTimer = (state.apTerrainUnsafeTimer || 0) + dt;
+              state.apTerrainStatus = 'WARNING';
+              if (!state.apTerrainWarningShown) {
+                state.apTerrainWarningShown = true;
+                showNavToast('⚠️ 自動駕駛正在重新確認前方地形；若安全路徑持續不可用，將解除並提示原因。');
               }
-            } else { state.apTerrainStatus = 'NORMAL'; }
+              if (state.apTerrainUnsafeTimer >= 1.35) {
+                state.apTerrainStatus = 'UNSAFE';
+                disconnectAutopilot('地形規劃持續無安全路徑', '無法保持安全航線，自動駕駛已解除，請立即接管。');
+              }
+            } else {
+              state.apTerrainUnsafeTimer = 0; state.apTerrainWarningShown = false;
+              if (state.apTerrainPlan?.status === 'AVOID') {
+                state.apTerrainStatus = 'AVOID';
+                if (state.autoLandRequested) {
+                  state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
+                  state.apPhase = 'CLIMB';
+                  showNavToast('⚠️ 進場路徑有地形風險，已取消自動降落並先繞開地形。');
+                }
+              } else { state.apTerrainStatus = 'NORMAL'; }
+            }
           }
           const normalizeAngle = (rad) => { while (rad > Math.PI) rad -= Math.PI * 2; while (rad < -Math.PI) rad += Math.PI * 2; return rad; };
           const smoothRate = (rate) => 1 - Math.exp(-rate * dt);
@@ -2577,7 +2590,7 @@
             }
           }
           if (state.onGround && state.apPhase === 'ROLLOUT') state.apPhase = 'ROLLOUT';
-          else if (state.onGround && state.speed < spec.liftoffKts * 1.05) state.apPhase = 'TOGA';
+          else if (state.onGround) state.apPhase = 'TOGA';
           else if (!state.onGround && distToThresholdM < 520 && altM < 18) state.apPhase = 'FLARE';
           else if (!state.onGround && state.autoLandRequested && state.autoLandCaptured) {
             state.apPhase = state.autoLandFinalCaptured ? 'APP' : 'ALIGN';
@@ -2626,7 +2639,7 @@
               const hdgErr = normalizeAngle(takeOffHdg - state.heading);
               state.heading += THREE.MathUtils.clamp(hdgErr * 2.5, -0.5, 0.5) * dt;
               state.roll += (0 - state.roll) * smoothRate(6.0);
-              const rotationPitch = spec.id === 'prop' ? 0.19 : 0.24;
+              const rotationPitch = spec.id === 'prop' ? 0.19 : 0.18;
               if (state.speed >= spec.liftoffKts * 0.94) state.pitch += (rotationPitch - state.pitch) * smoothRate(3.6);
               else state.pitch += (0 - state.pitch) * smoothRate(5.0);
             } else {
@@ -2729,7 +2742,7 @@
             }, spec, targetVerticalAccel), -0.16, 0.28);
             state.pitch += (targetPitch - state.pitch) * smoothRate(4.5);
 
-            const turnRate = (Math.sin(state.roll) * 0.78 + yawInput * spec.yawRate);
+            const turnRate = Math.sin(state.roll) * 0.78;
             state.heading += turnRate * dt;
           }
         } else {
@@ -2816,11 +2829,10 @@
           state.pos.y = getTerrainGroundHeightWorld(state.pos.x, state.pos.z) + spec.eyeHeight;
           state.vsFpm = 0;
           state.verticalSpeedMs = 0;
-          if (state.speed >= spec.liftoffKts && physicsStep.liftN >= spec.massKg * FlightPhysics.G * 0.94) {
+          if (state.speed >= spec.liftoffKts && physicsStep.liftN >= spec.massKg * FlightPhysics.G * 1.02) {
             state.onGround = false;
             state.brake = false;
             state.liftoffGraceTimer = 0.35;
-            state.pos.y += 0.04;
             const initialAirborneAero = FlightPhysics.calculateAero({ ...flightInput, speedMs: state.speed * FlightPhysics.KNOT_TO_MS, onGround: false }, spec, { powerFactor: ceilingPowerFactor });
             state.verticalSpeedMs = Math.max(0, initialAirborneAero.verticalAccelerationMs2 * dt);
             state.vsFpm = state.verticalSpeedMs * 196.8504;
@@ -3268,7 +3280,11 @@
       }
 
       function toggleAutopilot() {
-        state.autopilot = !state.autopilot;
+        if (state.autopilot) {
+          disconnectAutopilot('玩家手動關閉', '玩家已手動關閉自動駕駛。');
+          return;
+        }
+        state.autopilot = true; state.apDisconnectReason = ''; state.apTerrainUnsafeTimer = 0; state.apTerrainWarningShown = false;
         const btn = document.getElementById('btnAutopilot');
         if (state.autopilot) {
           if (state.unpoweredDive) {
@@ -4036,7 +4052,7 @@
         const alongRunwayFromAirport = (state.pos.x - landingAirport.x) * baseRunwayX + (state.pos.z - landingAirport.z) * baseRunwayZ;
         // 選擇飛機所在一側對應的跑道方向；同一條跑道可由兩端進場，避免從跑道背面繞圈。
         state.autoLandRunwayReverse = alongRunwayFromAirport > 0;
-        state.autopilot = true; state.autoLandRequested = true; state.atcCleared = true;
+        state.autopilot = true; state.apDisconnectReason = ''; state.apTerrainUnsafeTimer = 0; state.apTerrainWarningShown = false; state.autoLandRequested = true; state.atcCleared = true;
         state.apPhase = 'ALIGN'; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.atcPhaseAnnounced=''; state.atcApproachAreaAnnounced=false;
         state.pendingLandingResult = false; state.lastTouchdownVs = 0;
         state.simSpeed = 1; state.speedOptionIndex = 0;
