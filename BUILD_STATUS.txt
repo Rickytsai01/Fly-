@@ -1,0 +1,71 @@
+Taiwan Flight Simulator v7 - Build status
+
+Source: user-confirmed Taiwan_FlightSim_RealMap_Package.zip plus user-supplied 2026 20m DEM converted into terrain tiles in v3.
+
+v7 changes (real-world map enhancement):
+1. Added official NLSC WMS integration for the full-Taiwan EMAP basemap, draped over the existing true-elevation mesh when online imagery is available.
+2. Added six 12 km × 12 km airport-area orthophoto requests (TPE, RMQ, HUN, MZG, TTT, KHH) using the NLSC PHOTO2 layer, so airport surroundings can show actual aerial imagery rather than only elevation-based colors.
+3. Airport imagery is streamed at runtime from the official NLSC service; the project does not bulk-download or redistribute/copy the service's tiles. If network/CORS/service access fails, the simulator retains its DTM terrain and falls back to terrain coloring.
+4. Added visible map-data attribution and WMS source metadata to data/taiwan-map.json.
+5. The full-island 20m terrain stream and existing high-detail elevation remain unchanged. The supplied 20m raster still does not cover Magong/Penghu; the Magong airport area uses the official orthophoto overlay on the existing approximate offshore terrain model.
+
+v7 validation:
+- Inline JavaScript syntax check: PASS (Node.js --check).
+- data/taiwan-map.json schema/JSON parse: PASS.
+- Official WMS layer names and public WMS endpoint cross-checked against NLSC service documentation.
+- Browser/network/CORS texture loading has NOT been tested in this environment. Official imagery requires an internet connection; if the NLSC service denies browser cross-origin image access, the DTM fallback remains active.
+- No verified nationwide 3D building model, runway taxiway vector dataset, or complete land-cover vector dataset was added in v7. Orthophoto provides image detail, not individually modeled 3D buildings.
+
+v6 changes:
+1. Fixed the ground-collision fallback mismatch: when the real map JSON is unavailable or the aircraft is outside DEM coverage, collision height now follows the same procedural island height model used by the visible fallback terrain instead of returning sea level (0 m).
+2. Procedural collision fallback also preserves airport flattening/elevation and the major simplified river channels.
+3. When real map data fails to load, the simulator now shows an on-screen warning and identifies that it is using procedural terrain. This is especially relevant when HTML is opened directly with file:// rather than through the local HTTP server.
+4. Fixed a land-cover rendering error: the current dataset has landcoverTileCount=0, but its placeholder array contains class 5 values. The renderer now ignores placeholder land-cover values unless a real land-cover dataset is present, and falls back to elevation-based terrain colours.
+
+v5 changes retained:
+1. Tower / ATC speech and autopilot landing announcements changed to Traditional Chinese (Taiwan).
+2. Browser speech synthesis now requests zh-TW and prefers an installed zh-TW voice, then Traditional Chinese, then another Chinese voice if necessary.
+3. Tower status labels and spoken landing/approach phrases are localized.
+
+v4 changes retained:
+1. Auto-land guidance targets a fixed initial approach fix (IAF) 8 km before the selected runway threshold and captures final approach near the IAF.
+2. Final approach uses runway centerline cross-track correction instead of continually chasing a moving point behind the threshold.
+3. Windows launcher checks for `py` and then `python`; START_HERE.txt includes a PowerShell launch path.
+4. Reduced 2D guidance regression test remains in tools/test_autoland_guidance_v4.py.
+
+Validation for v5:
+- Inline JavaScript syntax check: PASS (Node.js --check).
+- Chinese text and zh-TW speech synthesis settings confirmed in source.
+- Full browser audio playback has NOT been tested on the user's Windows device; actual available voice depends on installed Windows/browser voices.
+- ZIP integrity checked after packaging.
+
+Existing v4 validation:
+- Reduced 2D guidance regression: 576/576 scenarios captured IAF/final corridor.
+- Terrain tile spot-checks from v3: 100 samples matched source GeoTIFF values.
+
+Not yet verified:
+- The user's exact underground-flight scenario has not been reproduced in a full browser session; v6 addresses the identified fallback-height mismatch, but must still be tested on the user's route and device.
+- Full in-browser end-to-end flight test with actual aircraft physics.
+- C172 and B737 complete descent, flare, touchdown, rollout and stop.
+- All airports/runway directions, crosswind, and 1x/5x/10x/20x under real browser runtime.
+- The 2D regression does not simulate lift, vertical path, energy, stall, flare, touchdown or fuel consumption.
+- Real buildings, land cover, roads and rivers are not included. The current land-cover array is only a placeholder and is no longer rendered as water; elevation-based colours are used until real land-cover data is supplied. 20m DEM coverage does not include Magong Airport.
+
+Do not describe the current build as a fully validated automatic landing system.
+
+
+v8 landing enhancements:
+1. Autoland now forces 1x simulation speed at engagement and refuses activation while the aircraft is on the ground (prevents accidental TOGA).
+2. IAF capture includes a bounded along-track gate in addition to waypoint radius capture to reduce missed-fix orbiting.
+3. Approach speed control remains active into flare with a lower target speed and limited thrust, avoiding abrupt power cut.
+4. Automatic touchdown checks runway direction, touchdown zone, lateral position, and game-specific touchdown speed limits. Manual landing rules are unchanged.
+5. Actual touchdown vertical speed is retained through rollout and arrival scoring.
+6. Autoland still requires runway rollout to a complete stop before passenger disembarkation / mission completion.
+
+v8 validation:
+- Inline JavaScript syntax check: PASS.
+- Existing reduced IAF/final-corridor test: 576/576 PASS (2D only).
+- Ground fallback regression: 6/6 PASS.
+- 20m terrain tile binary validation: 1,525 tiles PASS.
+- New v8 touchdown geometry/source regression: PASS (both runway directions; lateral/late/heading rejection; source guards).
+- Browser/WebGL/WMS CORS and complete flight-physics landing tests are NOT yet verified.

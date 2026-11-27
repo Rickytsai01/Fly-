@@ -1,0 +1,22 @@
+v7 REAL MAP SOURCES AND ATTRIBUTION
+
+1) Terrain elevation
+- User-provided 2026 Taiwan 20m DEM GeoTIFF.
+- CRS: EPSG:3826 (TWD97 / TM2 zone 121).
+- Used for the existing 20m streaming terrain mesh. Source coverage excludes Magong Airport/Penghu in this supplied raster.
+
+2) Official Taiwan basemap and airport-area orthophoto
+- Provider: National Land Surveying and Mapping Center (NLSC), Ministry of the Interior, Taiwan.
+- Public WMS endpoint: https://wms.nlsc.gov.tw/wms
+- Whole-island layer: EMAP (Taiwan general electronic map).
+- Airport-area layer: PHOTO2 (Taiwan general orthophoto).
+- NLSC service documentation: https://maps.nlsc.gov.tw/S09SOA/pro/Wms_ajax_main.jsp
+- NLSC states WMS is available without application for listed public layers. The simulator requests images at runtime and does not bulk-cache or redistribute map tiles.
+
+3) Limitations
+- Orthophoto is a raster image draped over the terrain, not a set of individually modeled 3D buildings.
+- No complete verified nationwide 3D buildings, taxiway/runway GIS, or land-cover vector data are packaged in v7.
+- Runtime imagery requires internet access and browser permission for cross-origin image loading. If unavailable, terrain DTM rendering remains.
+- The supplied 20m DEM coverage does not include Penghu/Magong; the existing approximate offshore terrain remains there.
+
+Attribution shown in simulator: Basemap/orthophoto © National Land Surveying and Mapping Center, Ministry of the Interior, Taiwan; elevation from the user-provided 2026 20m DEM dataset.
