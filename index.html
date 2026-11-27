@@ -293,9 +293,10 @@
   <div id="widget-attitudeBox" data-widget-id="attitudeBox" class="custom-widget hud-widget flex flex-col sm:flex-row items-start gap-1.5">
     <div class="glass rounded-xl p-1.5 shadow-lg">
       <canvas id="attitudeCanvas" width="84" height="84" class="rounded-lg block"></canvas>
-      <div class="flex justify-between text-[10px] mono mt-1 px-0.5">
+      <div class="flex justify-between gap-1 text-[9px] mono mt-1 px-0.5">
         <span id="hudGearStat" class="text-emerald-400 font-bold cursor-pointer" title="點擊收放起落架">GEAR DN</span>
         <span id="hudBrakeStat" class="text-amber-400 font-bold cursor-pointer" title="點擊切換煞車">BRK OFF</span>
+        <span id="hudFlapStat" class="text-slate-400 font-bold cursor-pointer" title="點擊循環襟翼檔位">FLAP 0%</span>
       </div>
     </div>
     <div id="papiPanel" class="glass rounded-xl px-2.5 py-2 hidden pointer-events-none">
@@ -607,6 +608,9 @@
         <button id="btnQuickTakeoff" class="btn-sim flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-sm sm:text-base shadow-xl cursor-pointer">
           ⚡ 跳過登機直接跑道起飛
         </button>
+        <button id="btnTaxiStart" class="btn-sim flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-400 hover:from-amber-200 hover:to-yellow-300 text-slate-950 font-black text-sm sm:text-base shadow-xl cursor-pointer">
+          🛞 滑行練習起點（引擎怠速）
+        </button>
         <button id="btnStartMission" class="btn-sim flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-400 hover:to-blue-400 text-slate-950 font-black text-sm sm:text-base shadow-xl cursor-pointer">
           🛫 執行旅客登機並起飛
         </button>
@@ -617,6 +621,7 @@
     </div>
   </div>
 
+  <script src="./flight-physics.js"></script>
   <script id="embeddedUserPrefs" type="application/json">{}</script>
 
   <script>
@@ -663,6 +668,7 @@
         { id: 'yawRight',      label: '右方向舵偏航 (Rudder Right)',    defaults: ['KeyD', ''] },
         { id: 'toggleBrake',   label: '切換機輪煞車 (Toggle Brake)',    defaults: ['Space', ''] },
         { id: 'toggleGear',    label: '收放起落架 (Toggle Gear)',       defaults: ['KeyG', ''] },
+        { id: 'toggleFlaps',   label: '襟翼檔位 (Cycle Flaps)',            defaults: ['KeyF', ''] },
         { id: 'toggleAp',      label: '切換定高自動駕駛 (Autopilot)',   defaults: ['KeyP', ''] },
         { id: 'cycleSimSpeed', label: '切換飛行時間倍速 (1x/2x/4x)',    defaults: ['Tab', ''] },
         { id: 'toggleMenu',    label: '開啟 / 關閉主選單 (Menu)',       defaults: ['Escape', ''] }
@@ -764,12 +770,14 @@
       }
 
       const AIRPORTS = [
-        { code: 'TPE', name: '桃園國際機場', en: 'Taoyuan Intl', x: 0 * M_TO_WORLD, z: 0 * M_TO_WORLD, rwyHeading: 50, rwyLen: 360, rwyWidth: 24, landmark: 'tpe' },
-        { code: 'RMQ', name: '台中清泉崗機場', en: 'Taichung Ching Chuan Kang', x: -38000 * M_TO_WORLD, z: 48000 * M_TO_WORLD, rwyHeading: 180, rwyLen: 350, rwyWidth: 24, landmark: 'rmq' },
-        { code: 'HUN', name: '花蓮縱谷機場', en: 'Hualien Airport', x: 46000 * M_TO_WORLD, z: 44000 * M_TO_WORLD, rwyHeading: 30, rwyLen: 310, rwyWidth: 22, landmark: 'hun' },
-        { code: 'MZG', name: '澎湖馬公離島機場', en: 'Penghu Magong Airport', x: -92000 * M_TO_WORLD, z: 62000 * M_TO_WORLD, rwyHeading: 20, rwyLen: 310, rwyWidth: 22, landmark: 'mzg' },
-        { code: 'TTT', name: '台東太平洋機場', en: 'Taitung Airport', x: 34000 * M_TO_WORLD, z: 108000 * M_TO_WORLD, rwyHeading: 40, rwyLen: 300, rwyWidth: 22, landmark: 'ttt' },
-        { code: 'KHH', name: '高雄港都國際機場', en: 'Kaohsiung Intl', x: -48000 * M_TO_WORLD, z: 132000 * M_TO_WORLD, rwyHeading: 90, rwyLen: 350, rwyWidth: 24, landmark: 'khh' }
+        // One published primary runway axis is represented at each airport.
+        // Length/width are published meters converted to the simulator's 10 m/world-unit scale.
+        { code: 'TPE', name: '桃園國際機場', en: 'Taoyuan Intl', x: 0 * M_TO_WORLD, z: 0 * M_TO_WORLD, rwyHeading: 49.08, rwyLen: 3660 * M_TO_WORLD, rwyWidth: 60 * M_TO_WORLD, landmark: 'tpe' },
+        { code: 'RMQ', name: '台中清泉崗機場', en: 'Taichung Cingcyuangang', x: -38000 * M_TO_WORLD, z: 48000 * M_TO_WORLD, rwyHeading: 176.69, rwyLen: 3659 * M_TO_WORLD, rwyWidth: 61 * M_TO_WORLD, landmark: 'rmq' },
+        { code: 'HUN', name: '花蓮機場', en: 'Hualien Airport', x: 46000 * M_TO_WORLD, z: 44000 * M_TO_WORLD, rwyHeading: 26.32, rwyLen: 2751 * M_TO_WORLD, rwyWidth: 45 * M_TO_WORLD, landmark: 'hun' },
+        { code: 'MZG', name: '澎湖馬公機場', en: 'Penghu Magong Airport', x: -92000 * M_TO_WORLD, z: 62000 * M_TO_WORLD, rwyHeading: 18.22, rwyLen: 3000 * M_TO_WORLD, rwyWidth: 45 * M_TO_WORLD, landmark: 'mzg' },
+        { code: 'TTT', name: '台東豐年機場', en: 'Taitung Fongnian', x: 34000 * M_TO_WORLD, z: 108000 * M_TO_WORLD, rwyHeading: 38.64, rwyLen: 2438 * M_TO_WORLD, rwyWidth: 45 * M_TO_WORLD, landmark: 'ttt' },
+        { code: 'KHH', name: '高雄國際機場', en: 'Kaohsiung Intl', x: -48000 * M_TO_WORLD, z: 132000 * M_TO_WORLD, rwyHeading: 91.90, rwyLen: 3150 * M_TO_WORLD, rwyWidth: 60 * M_TO_WORLD, landmark: 'khh' }
       ];
 
       const AIRCRAFT_SPECS = {
@@ -778,6 +786,10 @@
           maxSpeed: 145, cruiseSpeed: 122, stallSpeed: 46, vrSpeed: 52, liftoffKts: 55,
           serviceCeilingM: 4200, shortCruiseAltM: 1200, longCruiseAltM: 2100,
           maxClimbRateMs: 4.2, maxDescentRateMs: 5.5, maxThrustAcc: 18.8, dragCoeff: 0.00072,
+          massKg: 1090, wingAreaM2: 16.2, liftCoeffZero: 0.22, liftCurvePerRad: 6.0, criticalAoARad: 0.255, maxLiftCoefficient: 1.75,
+          postStallLiftDropPerRad: 2.1, zeroLiftDragCoeff: 0.027, inducedDragFactor: 0.045, gearDragIncrement: 0.012,
+          flapLiftIncrement: 0.55, flapDragIncrement: 0.018, postStallDragPerRad: 1.2, maxThrustN: 2850, thrustSpeedLoss: 0.42,
+          minimumThrustFactor: 0.3, brakeForceN: 3500, rollingResistance: 0.018,
           rollRate: 1.55, pitchRate: 1.15, yawRate: 0.68, retractableGear: false,
           eyeHeight: 0.48, paxCount: 3, basePayMultiplier: 1.0
         },
@@ -786,6 +798,10 @@
           maxSpeed: 365, cruiseSpeed: 310, stallSpeed: 118, vrSpeed: 125, liftoffKts: 130,
           serviceCeilingM: 12500, shortCruiseAltM: 3200, longCruiseAltM: 5400,
           maxClimbRateMs: 12.5, maxDescentRateMs: 14.0, maxThrustAcc: 31.5, dragCoeff: 0.00021,
+          massKg: 58000, wingAreaM2: 124.6, liftCoeffZero: 0.20, liftCurvePerRad: 5.8, criticalAoARad: 0.24, maxLiftCoefficient: 2.13,
+          postStallLiftDropPerRad: 2.4, zeroLiftDragCoeff: 0.022, inducedDragFactor: 0.045, gearDragIncrement: 0.012,
+          flapLiftIncrement: 0.75, flapDragIncrement: 0.025, postStallDragPerRad: 1.3, maxThrustN: 205000, thrustSpeedLoss: 0.67,
+          minimumThrustFactor: 0.3, brakeForceN: 85000, rollingResistance: 0.016,
           rollRate: 1.15, pitchRate: 0.88, yawRate: 0.48, retractableGear: true,
           eyeHeight: 1.18, paxCount: 16, basePayMultiplier: 1.65
         }
@@ -802,7 +818,7 @@
         fuelPct: 100, fuelMaxRangeKm: 95.6, fuelRemainingKm: 95.6, fuelEmptyNotified: false,
         boardingProgress: 0, boardingDuration: 12,
         pos: new THREE.Vector3(0, 0.48, 0), heading: 50 * Math.PI / 180, pitch: 0, roll: 0,
-        speed: 0, vsFpm: 0, throttle: 0, rudder: 0, brake: false, gearDown: true, gearAnim: 1.0,
+        speed: 0, vsFpm: 0, verticalSpeedMs: 0, throttle: 0, rudder: 0, brake: false, gearDown: true, gearAnim: 1.0, flaps: 0, stallWarning: false,
         onGround: true, liftoffGraceTimer: 0,
         unpoweredDive: false, diveRecoveryHold: 0, diveTimer: 0, diveRollBias: 0,
         birdStruck: false, inStormCell: false, lightningCooldown: 0, lightningEffectTimer: 0,
@@ -1263,6 +1279,8 @@
         const group = new THREE.Group();
         group.position.set(ap.x, (ap.groundY || 0) + 0.04, ap.z);
         group.rotation.y = -ap.rwyHeading * Math.PI / 180;
+        const taxiwayWidth = Math.max(2.4, ap.rwyWidth * 0.44);
+        const taxiwayOffset = ap.rwyWidth * 0.5 + 5;
 
         const apronGrass = new THREE.Mesh(new THREE.PlaneGeometry(ap.rwyWidth * 5.2, ap.rwyLen * 1.25), new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.95 }));
         apronGrass.rotation.x = -Math.PI / 2;
@@ -1270,11 +1288,30 @@
         apronGrass.receiveShadow = true;
         group.add(apronGrass);
 
-        const taxiway = new THREE.Mesh(new THREE.PlaneGeometry(9, ap.rwyLen * 0.9), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 }));
+        // Simplified parallel taxi lane with two playable runway exits; its paths are not surveyed airport taxiway data.
+        const taxiway = new THREE.Mesh(new THREE.PlaneGeometry(taxiwayWidth, ap.rwyLen * 0.9), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 }));
         taxiway.rotation.x = -Math.PI / 2;
-        taxiway.position.set(22, 0.025, 0);
+        taxiway.position.set(taxiwayOffset, 0.025, 0);
         taxiway.receiveShadow = true;
         group.add(taxiway);
+        const taxiMarkingMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+        const taxiCenterLine = new THREE.Mesh(new THREE.PlaneGeometry(0.12, ap.rwyLen * 0.88), taxiMarkingMat);
+        taxiCenterLine.rotation.x = -Math.PI / 2;
+        taxiCenterLine.position.set(taxiwayOffset, 0.055, 0);
+        group.add(taxiCenterLine);
+        const connectorLength = taxiwayOffset - ap.rwyWidth / 2;
+        [-1, 1].forEach(direction => {
+          const connectorZ = direction * ap.rwyLen * 0.28;
+          const connector = new THREE.Mesh(new THREE.PlaneGeometry(connectorLength, taxiwayWidth), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 }));
+          connector.rotation.x = -Math.PI / 2;
+          connector.position.set(ap.rwyWidth / 2 + connectorLength / 2, 0.04, connectorZ);
+          connector.receiveShadow = true;
+          group.add(connector);
+          const connectorLine = new THREE.Mesh(new THREE.PlaneGeometry(connectorLength, 0.12), taxiMarkingMat);
+          connectorLine.rotation.x = -Math.PI / 2;
+          connectorLine.position.set(ap.rwyWidth / 2 + connectorLength / 2, 0.06, connectorZ);
+          group.add(connectorLine);
+        });
 
         const rwy = new THREE.Mesh(new THREE.PlaneGeometry(ap.rwyWidth, ap.rwyLen), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 }));
         rwy.rotation.x = -Math.PI / 2;
@@ -1283,17 +1320,20 @@
         group.add(rwy);
 
         const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-        for (let z = -ap.rwyLen / 2 + 24; z < ap.rwyLen / 2 - 24; z += 18) {
-          const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 9), stripeMat);
+        for (let z = -ap.rwyLen / 2 + 24; z < ap.rwyLen / 2 - 24; z += 6) {
+          const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 3), stripeMat);
           dash.rotation.x = -Math.PI / 2;
           dash.position.set(0, 0.05, z);
           group.add(dash);
         }
+        const thresholdCount = Math.max(8, Math.round(ap.rwyWidth / 0.5));
+        const thresholdStep = ap.rwyWidth / (thresholdCount + 1);
         [-1, 1].forEach(dir => {
-          for (let x = -7; x <= 7; x += 2.8) {
-            const th = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 12), stripeMat);
+          for (let i = 1; i <= thresholdCount; i++) {
+            const x = (i - (thresholdCount + 1) / 2) * thresholdStep;
+            const th = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 1.2), stripeMat);
             th.rotation.x = -Math.PI / 2;
-            th.position.set(x, 0.05, dir * (ap.rwyLen / 2 - 12));
+            th.position.set(x, 0.05, dir * (ap.rwyLen / 2 - 1.2));
             group.add(th);
           }
         });
@@ -1302,39 +1342,39 @@
         const papiRed = new THREE.MeshBasicMaterial({color:0xff241c});
         const papiWhite = new THREE.MeshBasicMaterial({color:0xffffff});
         for(let i=0;i<4;i++){
-          const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.62,0.62), i<2?papiRed:papiWhite);
-          lamp.position.set(-ap.rwyWidth/2-8-i*1.35,0.72,-ap.rwyLen/2+22); papiGroup.add(lamp);
-          const glow=new THREE.PointLight(i<2?0xff3322:0xffffff,0.45,22,2); glow.position.copy(lamp.position); papiGroup.add(glow);
+          const lamp=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.12,0.18), i<2?papiRed:papiWhite);
+          lamp.position.set(-ap.rwyWidth/2-1.4-i*0.42,0.25,-ap.rwyLen/2+18); papiGroup.add(lamp);
+          const glow=new THREE.PointLight(i<2?0xff3322:0xffffff,0.45,10,2); glow.position.copy(lamp.position); papiGroup.add(glow);
         }
         group.add(papiGroup);
-        const edgeLightGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+        const edgeLightGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
         const edgeLightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-        for (let z = -ap.rwyLen / 2; z <= ap.rwyLen / 2; z += 25) {
-          [-ap.rwyWidth / 2 - 0.6, ap.rwyWidth / 2 + 0.6].forEach(lx => {
+        for (let z = -ap.rwyLen / 2; z <= ap.rwyLen / 2; z += 8) {
+          [-ap.rwyWidth / 2 - 0.45, ap.rwyWidth / 2 + 0.45].forEach(lx => {
             const l = new THREE.Mesh(edgeLightGeo, edgeLightMat);
-            l.position.set(lx, 0.28, z);
+            l.position.set(lx, 0.08, z);
             group.add(l);
           });
         }
 
-        const term = new THREE.Mesh(new THREE.BoxGeometry(20, 9, 72), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 }));
-        term.position.set(42, 4.5, 0);
+        const term = new THREE.Mesh(new THREE.BoxGeometry(8, 2.2, 36), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 }));
+        term.position.set(taxiwayOffset + 2, 1.1, 0);
         term.castShadow = true;
         term.receiveShadow = true;
         group.add(term);
 
-        const towerShaft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.5, 24, 12), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.6 }));
-        towerShaft.position.set(42, 12, -46);
+        const towerShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.62, 2.7, 12), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.6 }));
+        towerShaft.position.set(taxiwayOffset + 2, 1.35, -20);
         towerShaft.castShadow = true;
         group.add(towerShaft);
 
-        const towerCab = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 3.4, 4.5, 12), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.25, metalness: 0.5 }));
-        towerCab.position.set(42, 25, -46);
+        const towerCab = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.72, 0.42, 12), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.25, metalness: 0.5 }));
+        towerCab.position.set(taxiwayOffset + 2, 2.9, -20);
         towerCab.castShadow = true;
         group.add(towerCab);
 
-        const radarDish = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.4, 0.5), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
-        radarDish.position.set(42, 28.5, -46);
+        const radarDish = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.18, 0.08), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+        radarDish.position.set(taxiwayOffset + 2, 3.25, -20);
         group.add(radarDish);
         animatedProps.push({ obj: radarDish, axis: 'y', speed: 1.8 });
 
@@ -2032,7 +2072,7 @@
         const dirZ = -Math.cos(hdgRad);
 
         state.pos.set(ap.x + dirX * startOffset, (ap.groundY || 0) + spec.eyeHeight, ap.z + dirZ * startOffset);
-        state.heading = hdgRad; state.pitch = 0; state.roll = 0; state.speed = 0; state.vsFpm = 0;
+        state.heading = hdgRad; state.pitch = 0; state.roll = 0; state.speed = 0; state.vsFpm = 0; state.verticalSpeedMs = 0; state.flaps = 0; state.stallWarning = false;
         state.throttle = 0; state.rudder = 0; state.brake = false; state.gearDown = true; state.gearAnim = 1.0;
         state.onGround = true; state.liftoffGraceTimer = 0; state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
         state.unpoweredDive = false; state.diveRecoveryHold = 0; state.diveTimer = 0;
@@ -2051,6 +2091,19 @@
         worldPlaneGroup.rotation.set(0, -state.heading, 0);
       }
 
+      function placeAircraftOnTaxiway(ap) {
+        placeAircraftOnRunway(ap);
+        const heading = ap.rwyHeading * Math.PI / 180;
+        const taxiwayOffset = ap.rwyWidth * 0.5 + 5;
+        const localZ = ap.rwyLen * 0.2;
+        const localXWorld = Math.cos(heading) * taxiwayOffset - Math.sin(heading) * localZ;
+        const localZWorld = Math.sin(heading) * taxiwayOffset + Math.cos(heading) * localZ;
+        state.pos.set(ap.x + localXWorld, (ap.groundY || 0) + AIRCRAFT_SPECS[state.selectedAircraft].eyeHeight, ap.z + localZWorld);
+        state.heading = (heading + Math.PI) % (Math.PI * 2);
+        worldPlaneGroup.position.set(state.pos.x, (ap.groundY || 0) + 0.05, state.pos.z);
+        worldPlaneGroup.rotation.set(0, -state.heading, 0);
+      }
+
       function activateFlightControlsImmediately() {
         state.isPaused = false;
         document.getElementById('mainMenuModal').classList.add('hidden');
@@ -2062,7 +2115,7 @@
         try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); window.focus(); } catch (e) {}
       }
 
-      function prepareMissionCommon() {
+      function prepareMissionCommon(startPosition = 'runway') {
         SoundEngine.init();
         if (state.depCode === state.arrCode) {
           const other = AIRPORTS.find(a => a.code !== state.depCode);
@@ -2072,7 +2125,8 @@
         const dep = getAirport(state.depCode);
         const arr = getAirport(state.arrCode);
         rebuildAircraftModels(state.selectedAircraft);
-        placeAircraftOnRunway(dep);
+        if (startPosition === 'taxiway') placeAircraftOnTaxiway(dep);
+        else placeAircraftOnRunway(dep);
         spawnRouteHazards(dep, arr);
         return { dep, arr };
       }
@@ -2089,6 +2143,18 @@
         setTimeout(() => SoundEngine.playTone(659.25, 0.24, 'sine', 0.25), 130);
         const { arr, distKm, bearingDeg, cruiseAltM } = computeRouteStats();
         showNavToast(`🛫 跑道就緒！目的地 ${arr.code} ${arr.name} (${distKm.toFixed(1)} km / 航向 ${String(bearingDeg).padStart(3, '0')}° / 巡航 ${cruiseAltM.toLocaleString()}m)`);
+      }
+
+      function startTaxiwayPractice() {
+        const { dep, arr } = prepareMissionCommon('taxiway');
+        state.phase = 'FLIGHT';
+        state.boardingProgress = 1;
+        document.getElementById('boardingBanner').classList.add('hidden');
+        document.getElementById('btnSkipBoarding').classList.add('hidden');
+        if (cockpitProps.stairTruck) cockpitProps.stairTruck.visible = false;
+        cockpitProps.passengers.forEach(p => { p.mesh.visible = false; });
+        activateFlightControlsImmediately();
+        showNavToast(`🛞 ${dep.name} 滑行練習：飛機在簡化滑行道、引擎怠速待命。沿黃色中心線前進，於場內出口轉入跑道；此路線不是官方機場滑行圖。目的地：${arr.code}`);
       }
 
       function startMissionWithBoarding() {
@@ -2313,7 +2379,6 @@
         const ceilingRatio = altM / spec.serviceCeilingM;
         // 保留玩家選擇的時間倍速；固定物理子步進已負責穩定高倍速模擬。
 
-        const densityFactor = Math.exp(-altM / 8500);
         const ceilingPowerFactor = spec.id === 'prop'
           ? THREE.MathUtils.clamp(1.0 - Math.pow(Math.max(0, ceilingRatio), 1.65) * 0.88, 0.08, 1.0)
           : THREE.MathUtils.clamp(1.0 - Math.pow(Math.max(0, ceilingRatio), 2.2) * 0.82, 0.14, 1.0);
@@ -2380,31 +2445,35 @@
           else if (altM < cruiseAltM - 35) state.apPhase = 'CLIMB';
           else state.apPhase = 'CRZ';
 
-          if (state.fuelPct > 0) {
-            if (state.apPhase === 'ROLLOUT') { state.throttle = 0; state.brake = true; }
-            else if (state.apPhase === 'TOGA') { state.brake = false; state.throttle += (0.90 - state.throttle) * smoothRate(4.5); }
-            else if (state.apPhase === 'CLIMB') { state.throttle += (0.86 - state.throttle) * smoothRate(4.2); }
-            else if (state.apPhase === 'CRZ') { state.throttle += (0.78 - state.throttle) * smoothRate(4.0); }
-            else if (state.apPhase === 'ALIGN') { state.throttle += (0.66 - state.throttle) * smoothRate(3.4); }
-            else if (state.apPhase === 'APP') { state.throttle += (0.48 - state.throttle) * smoothRate(3.8); }
-            else if (state.apPhase === 'FLARE') { state.throttle += (0.08 - state.throttle) * smoothRate(2.8); }
-          } else {
+          const managedFlaps = ['TOGA', 'ALIGN', 'APP', 'FLARE'].includes(state.apPhase) ? 0.75 : 0;
+          state.flaps += (managedFlaps - state.flaps) * smoothRate(2.8);
+          if (state.fuelPct <= 0) {
             state.throttle = 0;
-          }
-
-          // 自動進場速度控制：避免固定油門讓飛機以巡航速度衝過跑道。
-          // 目標約為失速速度的 1.35 倍，並以目前密度、起落架阻力及俯仰重力估算前饋油門。
-          if (state.fuelPct > 0 && state.autoLandRequested && state.autoLandCaptured &&
-              (state.apPhase === 'ALIGN' || state.apPhase === 'APP' || state.apPhase === 'FLARE')) {
-            // Keep a safe energy margin through flare instead of cutting power abruptly.
-            const flare = state.apPhase === 'FLARE';
-            const approachTargetKts = Math.max(spec.stallSpeed * (flare ? 1.24 : 1.35),
-              spec.id === 'prop' ? (flare ? 61 : 66) : (flare ? 142 : 150));
-            const approachDragCoeff = spec.dragCoeff + (state.gearDown ? 0.00014 : 0);
-            const requiredApproachThrust = approachDragCoeff * densityFactor * approachTargetKts * approachTargetKts + Math.sin(state.pitch) * 14.5;
-            const feedForwardThrottle = requiredApproachThrust / Math.max(0.1, spec.maxThrustAcc * ceilingPowerFactor);
-            const speedCorrection = (approachTargetKts - state.speed) * (spec.id === 'prop' ? 0.0018 : 0.00045);
-            state.throttle = THREE.MathUtils.clamp(feedForwardThrottle + speedCorrection, 0, flare ? 0.48 : 0.78);
+          } else if (state.apPhase === 'ROLLOUT') {
+            state.throttle = 0;
+            state.brake = true;
+          } else if (state.apPhase === 'TOGA' && state.onGround) {
+            state.brake = false;
+            state.throttle += (0.9 - state.throttle) * smoothRate(4.5);
+          } else {
+            let targetSpeedKts = null;
+            if (state.apPhase === 'CLIMB') targetSpeedKts = Math.max(spec.stallSpeed * 1.55, spec.cruiseSpeed * 0.78);
+            else if (state.apPhase === 'CRZ') targetSpeedKts = spec.cruiseSpeed;
+            else if (['ALIGN', 'APP', 'FLARE'].includes(state.apPhase)) {
+              const flare = state.apPhase === 'FLARE';
+              targetSpeedKts = Math.max(spec.stallSpeed * (flare ? 1.24 : 1.35),
+                spec.id === 'prop' ? (flare ? 61 : 66) : (flare ? 142 : 150));
+            }
+            if (targetSpeedKts !== null) {
+              const targetSpeedMs = targetSpeedKts * FlightPhysics.KNOT_TO_MS;
+              const speedErrorMs = targetSpeedMs - state.speed * FlightPhysics.KNOT_TO_MS;
+              const desiredAccel = THREE.MathUtils.clamp(speedErrorMs * 0.35, -1.8, 1.8);
+              const throttleCommand = Math.min(state.apPhase === 'FLARE' ? 0.72 : 0.98, FlightPhysics.throttleForTargetSpeed({
+                speedMs: state.speed * FlightPhysics.KNOT_TO_MS, verticalSpeedMs: state.verticalSpeedMs, pitchRad: state.pitch, rollRad: state.roll,
+                altitudeM: altM, onGround: false, brake: false, gearDown: state.gearDown, flaps: state.flaps
+              }, spec, targetSpeedMs, desiredAccel, { powerFactor: ceilingPowerFactor }).throttle);
+              state.throttle += (throttleCommand - state.throttle) * smoothRate(state.apPhase === 'FLARE' ? 2.8 : 3.8);
+            }
           }
 
           if (state.onGround) {
@@ -2415,7 +2484,8 @@
               const hdgErr = normalizeAngle(takeOffHdg - state.heading);
               state.heading += THREE.MathUtils.clamp(hdgErr * 2.5, -0.5, 0.5) * dt;
               state.roll += (0 - state.roll) * smoothRate(6.0);
-              if (state.speed >= spec.liftoffKts * 0.94) state.pitch += (0.16 - state.pitch) * smoothRate(3.6);
+              const rotationPitch = spec.id === 'prop' ? 0.19 : 0.24;
+              if (state.speed >= spec.liftoffKts * 0.94) state.pitch += (rotationPitch - state.pitch) * smoothRate(3.6);
               else state.pitch += (0 - state.pitch) * smoothRate(5.0);
             } else {
               state.pitch += (0 - state.pitch) * smoothRate(6.0);
@@ -2482,7 +2552,6 @@
               state.roll += (desiredRoll - state.roll) * smoothRate(4.8);
             }
 
-            const speedMs = Math.max(22, state.speed * 0.514444);
             let desiredVyMs = 0;
             if (state.apPhase === 'FLARE') desiredVyMs = -0.45;
             else if (state.apPhase === 'APP' || state.apPhase === 'ALIGN') {
@@ -2502,20 +2571,12 @@
               const altErrM = cruiseAltM - altM;
               desiredVyMs = THREE.MathUtils.clamp(altErrM * 0.40, -spec.maxDescentRateMs, spec.maxClimbRateMs);
             }
-            // 垂直速度控制需把本模擬器的升力項一併計算；只用 asin(Vy/V)
-            // 會忽略升力造成的額外爬升，尤其在 FLARE 時可能在跑道前重新飄升。
-            const approachLiftRatio = (state.speed / spec.stallSpeed) * Math.sqrt(densityFactor);
-            const verticalRateAtPitch = (pitchRad) => {
-              const liftAcc = (approachLiftRatio * approachLiftRatio * 9.8 * Math.cos(state.roll) * (1 + pitchRad * 2.3)) - 9.8;
-              return speedMs * Math.sin(pitchRad) + liftAcc * 0.16;
-            };
-            let pitchLow = -0.35, pitchHigh = 0.25;
-            for (let pitchSolve = 0; pitchSolve < 14; pitchSolve++) {
-              const pitchMid = (pitchLow + pitchHigh) * 0.5;
-              if (verticalRateAtPitch(pitchMid) < desiredVyMs) pitchLow = pitchMid;
-              else pitchHigh = pitchMid;
-            }
-            const targetPitch = THREE.MathUtils.clamp((pitchLow + pitchHigh) * 0.5, -0.16, 0.22);
+            // 依垂直速度誤差決定加速度，再由升力反算目標攻角。
+            const targetVerticalAccel = THREE.MathUtils.clamp((desiredVyMs - state.verticalSpeedMs) * 1.3, -4, 4);
+            const targetPitch = THREE.MathUtils.clamp(FlightPhysics.pitchForVerticalAcceleration({
+              speedMs: state.speed * FlightPhysics.KNOT_TO_MS, verticalSpeedMs: state.verticalSpeedMs, pitchRad: state.pitch,
+              rollRad: state.roll, altitudeM: altM, flaps: state.flaps
+            }, spec, targetVerticalAccel), -0.16, 0.28);
             state.pitch += (targetPitch - state.pitch) * smoothRate(4.5);
 
             const turnRate = (Math.sin(state.roll) * 0.78 + yawInput * spec.yawRate);
@@ -2576,7 +2637,8 @@
         }
 
         const effectiveThr = (state.unpoweredDive || state.fuelPct <= 0) ? 0 : state.throttle;
-        const forwardSpeedWorldForFuel = state.speed * 0.05144 * Math.cos(state.pitch);
+        const gammaForFuel = Math.atan2(state.verticalSpeedMs, Math.max(2, state.speed * FlightPhysics.KNOT_TO_MS));
+        const forwardSpeedWorldForFuel = state.speed * 0.05144 * Math.cos(gammaForFuel);
         const distFlownKm = forwardSpeedWorldForFuel * dt * WORLD_TO_KM;
 
         if (distFlownKm > 0 && state.fuelRemainingKm > 0) {
@@ -2592,42 +2654,44 @@
           }
         }
 
-        const thrustForce = effectiveThr * spec.maxThrustAcc * ceilingPowerFactor;
-        const gearDrag = state.gearDown ? 0.00014 : 0;
-        const dragForce = (spec.dragCoeff + gearDrag) * densityFactor * state.speed * state.speed + (state.onGround && state.brake ? 24 : 0);
-        const pitchGravity = Math.sin(state.pitch) * 14.5;
-        state.speed = Math.max(0, state.speed + (thrustForce - dragForce - pitchGravity) * dt);
+        const flightInput = { speedMs: state.speed * FlightPhysics.KNOT_TO_MS, verticalSpeedMs: state.verticalSpeedMs,
+          pitchRad: state.pitch, rollRad: state.roll, altitudeM: altM, throttle: effectiveThr, onGround: state.onGround,
+          brake: state.brake, gearDown: state.gearDown, flaps: state.flaps };
+        const physicsStep = FlightPhysics.step(flightInput, spec, dt, { powerFactor: ceilingPowerFactor });
+        state.speed = physicsStep.speedMs / FlightPhysics.KNOT_TO_MS;
 
         if (state.onGround) {
           state.pos.y = getTerrainGroundHeightWorld(state.pos.x, state.pos.z) + spec.eyeHeight;
           state.vsFpm = 0;
-          if (state.speed >= spec.liftoffKts && state.pitch > 0.045) {
+          state.verticalSpeedMs = 0;
+          if (state.speed >= spec.liftoffKts && physicsStep.liftN >= spec.massKg * FlightPhysics.G * 0.94) {
             state.onGround = false;
             state.brake = false;
-            state.liftoffGraceTimer = 0.5;
-            const initialClimb = Math.max(1.8, (state.speed * 0.05144) * Math.sin(state.pitch) * 1.35);
-            state.pos.y += initialClimb * Math.max(dt, 0.016) + 0.12;
-            state.vsFpm = initialClimb * WORLD_TO_FT * 60;
+            state.liftoffGraceTimer = 0.35;
+            state.pos.y += 0.04;
+            const initialAirborneAero = FlightPhysics.calculateAero({ ...flightInput, speedMs: state.speed * FlightPhysics.KNOT_TO_MS, onGround: false }, spec, { powerFactor: ceilingPowerFactor });
+            state.verticalSpeedMs = Math.max(0, initialAirborneAero.verticalAccelerationMs2 * dt);
+            state.vsFpm = state.verticalSpeedMs * 196.8504;
             const { arr, distKm, bearingDeg } = computeRouteStats();
             showNavToast(`🛫 已離地起飛！飛往目的地 ${arr.code} ${arr.name} (航向 ${String(bearingDeg).padStart(3, '0')}° / ${distKm.toFixed(1)} km)`);
           }
         } else {
-          if (state.liftoffGraceTimer > 0) state.liftoffGraceTimer -= rawDt;
-          const speedRatio = (state.speed / spec.stallSpeed) * Math.sqrt(densityFactor);
-          const liftAcc = (speedRatio * speedRatio * 9.8 * Math.cos(state.roll) * (1 + state.pitch * 2.3)) - 9.8;
-          let climbSpeedWorld = (state.speed * 0.05144) * Math.sin(state.pitch) + liftAcc * 0.16;
-          if (state.liftoffGraceTimer > 0 && state.pitch > 0.02) climbSpeedWorld = Math.max(climbSpeedWorld, 1.45);
-          if (ceilingRatio > 0.94 && climbSpeedWorld > 0) {
-            const ceilingMargin = THREE.MathUtils.clamp((1.0 - ceilingRatio) / 0.06, 0, 1);
-            climbSpeedWorld *= ceilingMargin;
-            state.pitch = Math.max(-0.12, state.pitch - (1.0 - ceilingMargin) * 0.25 * dt);
+          if (state.liftoffGraceTimer > 0) state.liftoffGraceTimer = Math.max(0, state.liftoffGraceTimer - dt);
+          state.verticalSpeedMs = physicsStep.verticalSpeedMs;
+          if (ceilingRatio > 0.94 && state.verticalSpeedMs > 0) {
+            const ceilingMargin = THREE.MathUtils.clamp((1 - ceilingRatio) / 0.06, 0, 1);
+            state.verticalSpeedMs *= ceilingMargin;
+            state.pitch = Math.max(-0.12, state.pitch - (1 - ceilingMargin) * 0.25 * dt);
           }
-          if (altM >= spec.serviceCeilingM && climbSpeedWorld > 0) climbSpeedWorld = 0;
-          state.pos.y += climbSpeedWorld * dt;
-          state.vsFpm = (climbSpeedWorld * WORLD_TO_FT) * 60;
-          if (speedRatio < 1.02 && !state.unpoweredDive && state.liftoffGraceTimer <= 0) {
-            state.pitch = Math.max(-0.45, state.pitch - 0.35 * dt);
+          if (altM >= spec.serviceCeilingM && state.verticalSpeedMs > 0) state.verticalSpeedMs = 0;
+          const currentAero = FlightPhysics.calculateAero({ ...flightInput, speedMs: state.speed * FlightPhysics.KNOT_TO_MS, verticalSpeedMs: state.verticalSpeedMs, onGround: false }, spec, { powerFactor: ceilingPowerFactor });
+          if (currentAero.stalled && !state.unpoweredDive) state.pitch = Math.max(-0.45, state.pitch - 0.35 * dt);
+          if (currentAero.stalled !== state.stallWarning) {
+            state.stallWarning = currentAero.stalled;
+            showNavToast(state.stallWarning ? '⚠️ 失速警告：降低攻角並增加空速' : '✅ 失速警告解除');
           }
+          state.pos.y += state.verticalSpeedMs * dt * M_TO_WORLD;
+          state.vsFpm = state.verticalSpeedMs * 196.8504;
         }
 
         if (state.lightningEffectTimer > 0) state.lightningEffectTimer = Math.max(0, state.lightningEffectTimer - rawDt);
@@ -2646,7 +2710,8 @@
           }
         }
 
-        const forwardSpeedWorld = state.speed * 0.05144 * Math.cos(state.pitch);
+        const gammaForMovement = Math.atan2(state.verticalSpeedMs, Math.max(2, state.speed * FlightPhysics.KNOT_TO_MS));
+        const forwardSpeedWorld = state.speed * 0.05144 * Math.cos(gammaForMovement);
         state.pos.x += Math.sin(state.heading) * forwardSpeedWorld * dt;
         state.pos.z += -Math.cos(state.heading) * forwardSpeedWorld * dt;
         const targetGear = state.gearDown ? 1.0 : 0.0;
@@ -2657,6 +2722,7 @@
           const touchdownVs = state.vsFpm;
           const touchdownRoll = Math.abs(state.roll);
           state.pos.y = groundContactY;
+          state.verticalSpeedMs = 0;
           const landedAp = checkIfOnRunway(state.pos.x, state.pos.z);
           state.lastTouchdownVs = touchdownVs;
           const touchdownMetrics = landedAp ? getRunwayTouchdownMetrics(state.pos.x, state.pos.z, landedAp, state.heading) : null;
@@ -2678,7 +2744,7 @@
             }
           }
 
-          state.onGround = true; state.roll = 0; state.pitch = 0; state.brake = true;
+          state.onGround = true; state.verticalSpeedMs = 0; state.roll = 0; state.pitch = 0; state.brake = true;
           state.unpoweredDive = false; state.diveTimer = 0;
           if (state.autopilot) { state.apPhase = 'ROLLOUT'; state.throttle = 0; state.brake = true; atcSay('已確認觸地。反推保持怠速，減速板已準備，請保持跑道中心線。', '著陸滑行'); }
           if (state.autopilot && distArrKm < 4.5) {
@@ -2798,8 +2864,7 @@
       }
 
       // Evaluate the actual touchdown segment relative to the selected runway end.
-      // The runway model is deliberately wider than a real runway for playability;
-      // this check is narrower and only applies to the automatic-landing result.
+      // Runway surfaces use published dimensions; this detection envelope is widened slightly for forgiving gameplay.
       function getRunwayTouchdownMetrics(px, pz, ap, aircraftHeading) {
         const baseRad = ap.rwyHeading * Math.PI / 180;
         const baseError = Math.abs(((aircraftHeading - baseRad + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
@@ -2884,6 +2949,8 @@
         const brkEl = document.getElementById('hudBrakeStat');
         brkEl.textContent = state.brake ? 'BRK ON' : 'BRK OFF';
         brkEl.className = state.brake ? 'text-amber-400 font-bold cursor-pointer' : 'text-slate-500 font-bold cursor-pointer';
+        const flapEl = document.getElementById('hudFlapStat');
+        if (flapEl) { flapEl.textContent = `FLAP ${Math.round(state.flaps * 100)}%`; flapEl.className = state.flaps > 0 ? 'text-cyan-300 font-bold cursor-pointer' : 'text-slate-400 font-bold cursor-pointer'; }
 
         attCtx.clearRect(0, 0, 84, 84);
         attCtx.save();
@@ -2990,6 +3057,14 @@
       function toggleBrake() {
         state.brake = !state.brake;
         SoundEngine.playTone(state.brake ? 280 : 420, 0.12, 'sine', 0.18);
+      }
+
+      function cycleFlaps() {
+        const detents = [0, 0.33, 0.66, 1];
+        const nearest = detents.reduce((best, value, index) => Math.abs(value - state.flaps) < Math.abs(detents[best] - state.flaps) ? index : best, 0);
+        state.flaps = detents[(nearest + 1) % detents.length];
+        SoundEngine.playTone(state.flaps > 0 ? 460 : 620, 0.1, 'triangle', 0.18);
+        showNavToast(`襟翼設定 ${Math.round(state.flaps * 100)}%`);
       }
 
       function cycleSimSpeed() {
@@ -3288,6 +3363,7 @@
 
       document.getElementById('hudGearStat').addEventListener('click', () => { if (!state.isLayoutEditing) toggleGear(); });
       document.getElementById('hudBrakeStat').addEventListener('click', () => { if (!state.isLayoutEditing) toggleBrake(); });
+      document.getElementById('hudFlapStat').addEventListener('click', () => { if (!state.isLayoutEditing) cycleFlaps(); });
 
       window.addEventListener('keydown', (e) => {
         // 若正在按鍵綁定視窗中等待輸入
@@ -3344,6 +3420,7 @@
           }
           if (isActionPressed('toggleBrake')) toggleBrake();
           if (isActionPressed('toggleGear')) toggleGear();
+          if (isActionPressed('toggleFlaps')) cycleFlaps();
           if (isActionPressed('toggleAp')) toggleAutopilot();
           if (isActionPressed('cycleSimSpeed')) cycleSimSpeed();
         }
@@ -3562,6 +3639,7 @@
       document.getElementById('selArr').addEventListener('change', (e) => { state.arrCode = e.target.value; refreshRouteSummary(); });
       document.getElementById('btnQuickTakeoff').addEventListener('click', beginTakeoffRunDirectly);
       document.getElementById('btnStartMission').addEventListener('click', startMissionWithBoarding);
+      document.getElementById('btnTaxiStart').addEventListener('click', startTaxiwayPractice);
       document.getElementById('btnResumeFlight').addEventListener('click', () => { SoundEngine.init(); closeMenuModal(); });
       document.getElementById('btnSkipBoarding').addEventListener('click', () => { SoundEngine.init(); finishBoardingAndReadyForTakeoff(); });
       document.getElementById('btnOpenMenu').addEventListener('click', () => { if (!state.isLayoutEditing) openMenuModal(); });

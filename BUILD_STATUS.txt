@@ -1,3 +1,16 @@
+Taiwan Flight Simulator v10 - staged upgrade progress (2026-11-27)
+
+P0 - Project integrity: VERIFIED. Root index.html, .nojekyll, Taiwan map JSON and 20 m terrain tiles are present. Runtime uses Three.js r128 and relative project paths suitable for /Fly-/.
+P1 - Flight and ground physics: PARTIAL. Added a shared SI force model for lift, drag, thrust, altitude-dependent density, angle of attack, stall response, flaps, landing gear, rolling resistance, brakes, and force-based autopilot pitch/speed control. Keyboard flap cycle and HUD indicator are available. Ground steering and simplified taxi connectors exist, with an optional practice start on the modeled taxi lane. The engine is already idling at that start. Full gate start, engine-start/pushback procedure, surveyed taxi routes, complete angular dynamics, center-of-gravity model, and wind effects on the aircraft are not implemented.
+P2 - Controls: PARTIAL. Keyboard, pointer/touch controls, and basic Gamepad API axes are present. Full controller calibration/remapping, device-specific axis discovery, and hardware verification remain incomplete.
+P3 - Taiwan data and airports: PARTIAL. Existing NLSC imagery and 20 m DEM streaming remain intact. Six airport positions/elevations load from the map dataset. Primary runway headings and dimensions are updated from the current Taiwan CAA eAIP; one runway axis per modeled airport is represented. Taxi connectors and terminal/tower shapes are simplified game geometry, not surveyed airport layouts. Other requested airports, comprehensive taxiways, stands, gates, and detailed buildings remain incomplete.
+P4 - Weather, AI and ATC: PARTIAL. Existing visual weather and localized ATC features remain. Weather is not yet a complete aerodynamic wind/temperature/pressure model; AI traffic and ground vehicles are incomplete.
+P5 - Visual quality and performance: PARTIAL. Existing quality controls and terrain streaming remain. This build does not implement ray tracing; no end-to-end mobile GPU performance test has been completed.
+P6 - Deployment: PENDING FINAL CHECK. Verify the latest commit on main and the public GitHub Pages route after publishing.
+
+Verified automated tests in this upgrade stage: flight-physics unit/simulation test, HTML inline-script syntax check, map/terrain integrity check. Desktop browser showed real terrain status in an earlier local run; current post-change browser console, live Pages rendering, touch controls, and external controller hardware are not verified.
+
+Runway source notes and explicit modeling limits are recorded in data/airport-runway-sources.md. Do not describe this build as a fully validated professional flight simulator or as having the full gate-to-gate workflow.
 Taiwan Flight Simulator v7 - Build status
 
 Source: user-confirmed Taiwan_FlightSim_RealMap_Package.zip plus user-supplied 2026 20m DEM converted into terrain tiles in v3.
