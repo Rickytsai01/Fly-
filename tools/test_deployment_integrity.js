@@ -17,7 +17,9 @@ assert.match(html, /<script\s+src=["']\.\/flight-physics\.js["']/i, 'flight phys
 assert.match(html, /<script\s+src=["']\.\/gamepad-controls\.js["']/i, 'gamepad module must use a relative path');
 assert.ok(html.includes('id="btnCameraView"'), 'camera view control is missing');
 assert.ok(html.includes('id="btnOpenGamepadSettings"'), 'controller settings button is missing');
-assert.ok(html.includes('id="windDirection"') && html.includes('id="windSpeed"') && html.includes('id="windGust"'), 'wind controls are missing');
+assert.ok(html.includes('id="windStatus"'), 'automatic wind status is missing');
+assert.ok(!html.includes('id="windSpeed"') && !html.includes('id="windDirection"'), 'wind must not be manually configurable');
+assert.ok(html.includes('state.windSpeedKts = 4 + Math.random() * 12'), 'wind is generated per flight');
 assert.ok(html.includes('id="hudGroundSpeed"'), 'groundspeed readout is missing');
 assert.ok(html.includes('FlightPhysics.groundVelocity('), 'wind must be integrated into horizontal movement');
 assert.ok(html.includes('data-gp-axis="roll"') && html.includes('data-gp-axis="throttle"'), 'configurable axis selectors are missing');

@@ -591,14 +591,9 @@
       </div>
 
       <div class="mb-4">
-        <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider mb-2">3. 風向與陣風</label>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <label class="text-[11px] text-slate-300">風向（風從哪裡吹來，°）<input id="windDirection" type="number" min="0" max="359" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
-          <label class="text-[11px] text-slate-300">平均風速（kt）<input id="windSpeed" type="number" min="0" max="50" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
-          <label class="text-[11px] text-slate-300">陣風變化（± kt）<input id="windGust" type="number" min="0" max="15" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
-        </div>
-        <div id="windStatus" class="mt-2 rounded-lg border border-sky-900/70 bg-slate-900/70 px-3 py-2 text-[11px] text-sky-200" aria-live="polite"></div>
-        <p class="mt-1 text-[10px] text-slate-400">風與簡化的週期陣風只影響空中地速和地面航跡；不代表完整的風切、亂流或大氣模型。設定會保存在此瀏覽器。</p>
+        <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider mb-2">3. 自動天氣與風況</label>
+        <div id="windStatus" class="rounded-lg border border-sky-900/70 bg-slate-900/70 px-3 py-2 text-[11px] text-sky-200" aria-live="polite"></div>
+        <p class="mt-1 text-[10px] text-slate-400">風向、平均風速與陣風由遊戲在每次出發時自動生成，飛行中平滑變化；玩家無法手動設定。</p>
       </div>
 
       <div class="mb-4">
@@ -684,7 +679,6 @@
       const STORAGE_KEY_LAYOUT = 'flightSimPro_customLayout_v2';
       const STORAGE_KEY_KEYS = 'flightSimPro_customKeys_v2';
       const STORAGE_KEY_GAMEPAD = 'flightSimPro_gamepad_v1';
-      const STORAGE_KEY_WIND = 'flightSimPro_wind_v1';
 
       // 13 個獨立可自由拖曳/縮放/透明度控制項定義
       const WIDGET_META = {
@@ -750,25 +744,6 @@
         return {};
       }
       const embeddedPrefs = loadEmbeddedPrefs();
-
-      function normalizeWindSettings(value) {
-        const input = value || {};
-        const direction = Number(input.directionDeg);
-        const speed = Number(input.speedKts);
-        const gust = Number(input.gustKts);
-        return {
-          directionDeg: ((Math.round(Number.isFinite(direction) ? direction : 0) % 360) + 360) % 360,
-          speedKts: THREE.MathUtils.clamp(Number.isFinite(speed) ? speed : 0, 0, 50),
-          gustKts: THREE.MathUtils.clamp(Number.isFinite(gust) ? gust : 0, 0, 15)
-        };
-      }
-      function loadWindSettings() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY_WIND);
-          return normalizeWindSettings(raw ? JSON.parse(raw) : embeddedPrefs.wind);
-        } catch (e) { return normalizeWindSettings(embeddedPrefs.wind); }
-      }
-      const windSettings = loadWindSettings();
 
       function loadGamepadSettings() {
         try {
@@ -893,7 +868,7 @@
 
       const state = {
         balance: 120000, selectedAircraft: 'prop', depCode: 'TPE', arrCode: 'HUN',
-        windDirectionDeg: windSettings.directionDeg, windSpeedKts: windSettings.speedKts, windGustKts: windSettings.gustKts,
+        windDirectionDeg: 0, windSpeedKts: 0, windGustKts: 0, windPhase: 0,
         groundSpeedKts: 0, windClockSec: 0,
         controlMode: isNarrowTouchDevice ? 'mobile' : 'desktop',
         cameraMode: 'cockpit', gamepadUiTimer: 0, gamepadButtonsDown: {},
@@ -1670,17 +1645,6 @@
         showNavToast('⚡ 遭遇雷擊：機體未立即失控，請保持姿態並檢查儀表與飛行狀態。');
       }
 
-      function triggerWindShear() {
-        // Wind shear produces a short airspeed/attitude upset, not an instant rollover.
-        const speedLoss = 5 + Math.random() * 7;
-        state.speed = Math.max(0, state.speed - speedLoss);
-        state.pitch = THREE.MathUtils.clamp(state.pitch - (0.025 + Math.random() * 0.025), -0.78, 0.78);
-        state.roll = THREE.MathUtils.clamp(state.roll + (Math.random() - 0.5) * 0.12, -1.45, 1.45);
-        state.windShearCooldown = 24 + Math.random() * 18;
-        SoundEngine.playTone(92, 0.55, 'sawtooth', 0.34);
-        showNavToast('🌬️ 偵測到風切變！空速突然下降，請平穩修正姿態並監控空速。');
-      }
-
       const worldPlaneGroup = new THREE.Group();
       const cockpitGroup = new THREE.Group();
       scene.add(worldPlaneGroup);
@@ -2150,29 +2114,18 @@
       }
 
       function getWindVectorAtTime(timeSeconds = state.windClockSec) {
-        const gustOffsetKts = Math.sin((Math.PI * 2 * timeSeconds) / 18) * state.windGustKts;
+        const phase = timeSeconds * (Math.PI * 2 / 75) + state.windPhase;
+        const gustOffsetKts = state.windGustKts * (0.72 * Math.sin(phase) + 0.28 * Math.sin(phase * 0.37 + 1.4));
+        const directionOffsetDeg = 9 * Math.sin(phase * 0.53 + 0.8);
         const gustSpeedKts = Math.max(0, state.windSpeedKts + gustOffsetKts);
-        return FlightPhysics.windComponents(state.windDirectionDeg, gustSpeedKts);
+        return FlightPhysics.windComponents(state.windDirectionDeg + directionOffsetDeg, gustSpeedKts);
       }
 
       function updateWindControlsUI() {
-        document.getElementById('windDirection').value = state.windDirectionDeg;
-        document.getElementById('windSpeed').value = state.windSpeedKts;
-        document.getElementById('windGust').value = state.windGustKts;
-        document.getElementById('windStatus').textContent = '風自 ' + String(state.windDirectionDeg).padStart(3, '0') + '°，平均 ' + state.windSpeedKts + ' kt，陣風週期變化 ±' + state.windGustKts + ' kt；空中地速 ' + Math.round(state.groundSpeedKts) + ' kt';
-      }
-
-      function saveWindSettings() {
-        const normalized = normalizeWindSettings({
-          directionDeg: document.getElementById('windDirection').value,
-          speedKts: document.getElementById('windSpeed').value,
-          gustKts: document.getElementById('windGust').value
-        });
-        state.windDirectionDeg = normalized.directionDeg;
-        state.windSpeedKts = normalized.speedKts;
-        state.windGustKts = normalized.gustKts;
-        try { localStorage.setItem(STORAGE_KEY_WIND, JSON.stringify(normalized)); } catch (e) {}
-        updateWindControlsUI();
+        const current = getWindVectorAtTime();
+        const speed = Math.hypot(current.xMs, current.zMs) / FlightPhysics.KNOT_TO_MS;
+        const direction = ((state.windDirectionDeg % 360) + 360) % 360;
+        document.getElementById('windStatus').textContent = '本趟自動風況｜風向約 ' + Math.round(direction) + '°｜目前風速 ' + speed.toFixed(1) + ' kt｜地速 ' + Math.round(state.groundSpeedKts) + ' kt';
       }
 
       function placeAircraftOnRunway(ap) {
@@ -2185,7 +2138,10 @@
         state.pos.set(ap.x + dirX * startOffset, (ap.groundY || 0) + spec.eyeHeight, ap.z + dirZ * startOffset);
         state.heading = hdgRad; state.pitch = 0; state.roll = 0; state.speed = 0; state.vsFpm = 0; state.verticalSpeedMs = 0; state.flaps = 0; state.stallWarning = false;
         state.throttle = 0; state.rudder = 0; state.brake = false; state.gearDown = true; state.gearAnim = 1.0;
-        state.onGround = true; state.liftoffGraceTimer = 0; state.groundSpeedKts = 0; state.windClockSec = 0; state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
+        state.onGround = true; state.liftoffGraceTimer = 0; state.groundSpeedKts = 0; state.windClockSec = 0;
+        state.windDirectionDeg = Math.random() * 360; state.windSpeedKts = 4 + Math.random() * 12; state.windGustKts = 1 + Math.random() * 5; state.windPhase = Math.random() * Math.PI * 2;
+        updateWindControlsUI();
+        state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
         state.unpoweredDive = false; state.diveRecoveryHold = 0; state.diveTimer = 0;
         state.birdStruck = false; state.inStormCell = false; state.windShearCooldown = 0; state.autoTimeCycleTimer = 0; state.lastAnnouncedKmBracket = 9999; state.keys = {};
 
@@ -2351,6 +2307,50 @@
         resModal.classList.remove('hidden');
       }
 
+      const AP_TERRAIN_CLEARANCE_M = 500;
+      function planAutopilotTerrain(targetX, targetZ, altitudeM, spec) {
+        const dx = targetX - state.pos.x, dz = targetZ - state.pos.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 100) return { safe: true, heading: Math.atan2(dx, -dz), status: 'NORMAL' };
+        const speedMs = Math.max(35, state.speed * FlightPhysics.KNOT_TO_MS);
+        const maxClimb = Math.max(0.4, spec.maxClimbRateMs * 0.65);
+        const marginAt = (x, z, flownM) => {
+          const terrainM = Math.max(0, getTerrainGroundHeightWorld(x, z) * WORLD_TO_M);
+          const safeAltitudeLimitM = Math.min(spec.serviceCeilingM * 0.9, Math.max(altitudeM, state.cruiseAltM));
+          const reachableM = Math.min(safeAltitudeLimitM, altitudeM + Math.max(0, maxClimb + Math.max(-0.5, state.verticalSpeedMs)) * (flownM / speedMs));
+          return reachableM - terrainM - AP_TERRAIN_CLEARANCE_M;
+        };
+        const directHeading = Math.atan2(dx, -dz);
+        const candidates = [{ heading: directHeading, offset: 0 }];
+        for (const side of [-1, 1]) for (const offset of [800, 1600, 2600]) candidates.push({ heading: directHeading, offset: side * offset });
+        let best = null;
+        for (const c of candidates) {
+          const ux = dx / distance, uz = dz / distance;
+          const waypointDistance = Math.min(distance * 0.45, Math.max(1000, Math.min(2600, distance * 0.32)));
+          const wx = state.pos.x + ux * waypointDistance + uz * c.offset;
+          const wz = state.pos.z + uz * waypointDistance - ux * c.offset;
+          const points = c.offset === 0 ? [[state.pos.x, state.pos.z], [targetX, targetZ]] : [[state.pos.x, state.pos.z], [wx, wz], [targetX, targetZ]];
+          let safe = true, flown = 0, minimumMargin = Infinity;
+          for (let seg = 0; seg < points.length - 1 && safe; seg++) {
+            const [ax, az] = points[seg], [bx, bz] = points[seg + 1];
+            const lengthM = Math.hypot(bx - ax, bz - az) * WORLD_TO_M;
+            const samples = Math.max(2, Math.ceil(lengthM / 1500));
+            for (let i = 1; i <= samples; i++) {
+              const t = i / samples, margin = marginAt(ax + (bx - ax) * t, az + (bz - az) * t, flown + lengthM * t);
+              minimumMargin = Math.min(minimumMargin, margin);
+              if (margin < 0) { safe = false; break; }
+            }
+            flown += lengthM;
+          }
+          if (!safe) continue;
+          const firstHeading = Math.atan2(points[1][0] - state.pos.x, -(points[1][1] - state.pos.z));
+          const deviation = Math.abs(((firstHeading - directHeading + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+          const score = deviation * 10000 + Math.max(0, Math.abs(c.offset) - 8000) - Math.min(2000, minimumMargin);
+          if (!best || score < best.score) best = { safe: true, heading: firstHeading, status: c.offset ? 'AVOID' : 'NORMAL', score, minimumMargin };
+        }
+        return best || { safe: false, heading: directHeading, status: 'UNSAFE' };
+      }
+
       function updatePhysics(rawDt) {
         const dt = Math.min(rawDt, 0.05) * state.simSpeed;
         const spec = AIRCRAFT_SPECS[state.selectedAircraft];
@@ -2508,6 +2508,27 @@
         }
 
         if (state.autopilot) {
+          if (!state.onGround) {
+            state.apTerrainTimer = (state.apTerrainTimer || 0) - dt;
+            if (state.apTerrainTimer <= 0) {
+              state.apTerrainTimer = 0.45;
+              state.apTerrainPlan = planAutopilotTerrain(arrAp.x, arrAp.z, altM, spec);
+            }
+            if (state.apTerrainPlan && !state.apTerrainPlan.safe) {
+              state.autopilot = false; state.apPhase = 'OFF'; state.apTerrainStatus = 'UNSAFE'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
+              document.getElementById('btnAutopilot').textContent = '🤖 AP 關';
+              document.getElementById('btnAutopilot').className = 'btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-300 cursor-pointer';
+              showNavToast('⚠️ 航線前方地形無安全繞行或爬升路徑；自動駕駛已中止，請立即接管。');
+              SoundEngine.playApDisconnect();
+            } else if (state.apTerrainPlan?.status === 'AVOID') {
+              state.apTerrainStatus = 'AVOID';
+              if (state.autoLandRequested) {
+                state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false;
+                state.apPhase = 'CLIMB';
+                showNavToast('⚠️ 進場路徑有地形風險，已取消自動降落並先繞開地形。');
+              }
+            } else { state.apTerrainStatus = 'NORMAL'; }
+          }
           const normalizeAngle = (rad) => { while (rad > Math.PI) rad -= Math.PI * 2; while (rad < -Math.PI) rad += Math.PI * 2; return rad; };
           const smoothRate = (rate) => 1 - Math.exp(-rate * dt);
           const rwyHdgRad = getAutoLandRunwayHeading(arrAp) * Math.PI / 180;
@@ -2627,7 +2648,11 @@
               }
             }
 
-            if (state.autoLandRequested && state.autoLandCaptured) {
+            if (state.apTerrainStatus === 'AVOID' && state.apTerrainPlan?.safe) {
+              const hdgDiff = normalizeAngle(state.apTerrainPlan.heading - state.heading);
+              const desiredRoll = THREE.MathUtils.clamp(hdgDiff * 0.9, -0.35, 0.35);
+              state.roll += (desiredRoll - state.roll) * smoothRate(3.0);
+            } else if (state.autoLandRequested && state.autoLandCaptured) {
               const relX = state.pos.x - thresholdX;
               const relZ = state.pos.z - thresholdZ;
               const alongTrack = relX * rwyDirX + relZ * rwyDirZ;
@@ -2651,10 +2676,12 @@
               const desiredRoll = THREE.MathUtils.clamp(hdgDiff * 1.25, -0.42, 0.42);
               state.roll += (desiredRoll - state.roll) * smoothRate(4.0);
             } else if (state.apPhase === 'ALIGN' || distArrKm > 9.5) {
-              const targetHdg = Math.atan2(fafX - state.pos.x, -(fafZ - state.pos.z));
+              const targetHdg = state.apTerrainStatus === 'AVOID' && state.apTerrainPlan?.safe
+                ? state.apTerrainPlan.heading
+                : Math.atan2(fafX - state.pos.x, -(fafZ - state.pos.z));
               const hdgDiff = normalizeAngle(targetHdg - state.heading);
-              const desiredRoll = THREE.MathUtils.clamp(hdgDiff * 1.4, -0.44, 0.44);
-              state.roll += (desiredRoll - state.roll) * smoothRate(4.2);
+              const desiredRoll = THREE.MathUtils.clamp(hdgDiff * 0.9, -0.35, 0.35);
+              state.roll += (desiredRoll - state.roll) * smoothRate(3.0);
             } else {
               const aimPointX = arrAp.x - rwyDirX * 55;
               const aimPointZ = arrAp.z - rwyDirZ * 55;
@@ -2666,7 +2693,9 @@
             }
 
             let desiredVyMs = 0;
-            if (state.apPhase === 'FLARE') desiredVyMs = -0.45;
+            if (state.apTerrainStatus === 'AVOID') {
+              desiredVyMs = THREE.MathUtils.clamp((cruiseAltM - altM) * 0.4, -spec.maxDescentRateMs, spec.maxClimbRateMs * 0.7);
+            } else if (state.apPhase === 'FLARE') desiredVyMs = -0.45;
             else if (state.apPhase === 'APP' || state.apPhase === 'ALIGN') {
               let glideRangeM = distToThresholdM;
               if (state.autoLandRequested && state.autoLandCaptured) {
@@ -2809,11 +2838,7 @@
 
         if (state.lightningEffectTimer > 0) state.lightningEffectTimer = Math.max(0, state.lightningEffectTimer - rawDt);
         if (state.inStormCell && !state.onGround) {
-          // Convective turbulence can disturb attitude gradually; lightning itself does not flip the aircraft.
-          state.roll += (Math.random() - 0.5) * 0.22 * dt * 10;
-          state.pitch += (Math.random() - 0.5) * 0.12 * dt * 10;
-          state.windShearCooldown -= rawDt;
-          if (state.windShearCooldown <= 0 && Math.random() < 0.32) triggerWindShear();
+          // Storm visuals and lightning remain, but configured wind never changes aircraft speed randomly.
           state.lightningCooldown -= rawDt;
           if (state.lightningCooldown <= 0) {
             state.lightningCooldown = 2.0 + Math.random() * 2.5;
@@ -3066,7 +3091,7 @@
 
         if (state.autopilot) {
           apPhaseEl.classList.remove('hidden');
-          apPhaseEl.textContent = `AP:${state.apPhase}`;
+          apPhaseEl.textContent = `AP:${state.apTerrainStatus === 'AVOID' ? '繞避地形' : state.apPhase}`;
         } else {
           apPhaseEl.classList.add('hidden');
         }
@@ -3906,7 +3931,6 @@
 
       document.getElementById('selDep').addEventListener('change', (e) => { state.depCode = e.target.value; refreshRouteSummary(); });
       document.getElementById('selArr').addEventListener('change', (e) => { state.arrCode = e.target.value; refreshRouteSummary(); });
-      ['windDirection', 'windSpeed', 'windGust'].forEach(id => document.getElementById(id).addEventListener('change', saveWindSettings));
       updateWindControlsUI();
       document.getElementById('btnQuickTakeoff').addEventListener('click', beginTakeoffRunDirectly);
       document.getElementById('btnStartMission').addEventListener('click', startMissionWithBoarding);
@@ -3924,7 +3948,7 @@
         try {
           const prefsScript = document.getElementById('embeddedUserPrefs');
           if (prefsScript) {
-            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds, gamepad: gamepadSettings, wind: { directionDeg: state.windDirectionDeg, speedKts: state.windSpeedKts, gustKts: state.windGustKts } });
+            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds, gamepad: gamepadSettings });
           }
           const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
           const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -4366,8 +4390,8 @@
         geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
         geo.setAttribute('color',new THREE.BufferAttribute(col,3));
         geo.setIndex(new THREE.BufferAttribute(idx,1)); geo.computeVertexNormals();
-        const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.96,metalness:0,side:THREE.DoubleSide}));
-        mesh.frustumCulled=false; mesh.receiveShadow=true; mesh.userData.tileKey=`${record.r}:${record.c}`;
+        const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.96,metalness:0,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+        mesh.frustumCulled=false; mesh.receiveShadow=false; mesh.userData.tileKey=`${record.r}:${record.c}`;
         terrainTileGroup.add(mesh);
         return mesh;
       }
@@ -4582,7 +4606,7 @@
         // finer visual detail around each airport without replacing elevation.
         const terrainMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.96,metalness:0.0});
         const mesh=new THREE.Mesh(geo,terrainMat);
-        mesh.receiveShadow=false; mesh.castShadow=true; mesh.frustumCulled=false; scene.add(mesh);
+        mesh.receiveShadow=false; mesh.castShadow=false; mesh.frustumCulled=false; scene.add(mesh);
         taiwanTerrainMesh=mesh;
         buildTaiwanOceanAndCloudsForDataMap();
         buildDataDrivenVegetation(data);
