@@ -4,6 +4,23 @@
   const KNOT_TO_MS = 0.514444444444;
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
+  function windComponents(directionFromDeg, speedKts) {
+    const direction = ((Number(directionFromDeg) || 0) % 360 + 360) % 360 * Math.PI / 180;
+    const speedMs = Math.max(0, Number(speedKts) || 0) * KNOT_TO_MS;
+    return { xMs: -Math.sin(direction) * speedMs, zMs: Math.cos(direction) * speedMs };
+  }
+
+  function groundVelocity(speedKts, headingRad, verticalSpeedMs, wind, onGround) {
+    const speedMs = Math.max(0, Number(speedKts) || 0) * KNOT_TO_MS;
+    const gamma = Math.atan2(Number(verticalSpeedMs) || 0, Math.max(2, speedMs));
+    const forwardMs = speedMs * Math.cos(gamma);
+    const windX = onGround ? 0 : (Number(wind && wind.xMs) || 0);
+    const windZ = onGround ? 0 : (Number(wind && wind.zMs) || 0);
+    const xMs = Math.sin(Number(headingRad) || 0) * forwardMs + windX;
+    const zMs = -Math.cos(Number(headingRad) || 0) * forwardMs + windZ;
+    return { xMs, zMs, groundSpeedKts: Math.hypot(xMs, zMs) / KNOT_TO_MS };
+  }
+
   function airDensity(altitudeM) {
     const h = Math.max(0, Number(altitudeM) || 0);
     const rho0 = 1.225;
@@ -112,7 +129,7 @@
     };
   }
 
-  const api = { G, KNOT_TO_MS, airDensity, calculateAero, throttleForTargetSpeed, pitchForVerticalAcceleration, step };
+  const api = { G, KNOT_TO_MS, airDensity, windComponents, groundVelocity, calculateAero, throttleForTargetSpeed, pitchForVerticalAcceleration, step };
   root.FlightPhysics = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

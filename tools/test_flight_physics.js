@@ -7,6 +7,17 @@ const airborne = { speedMs: 55 * fp.KNOT_TO_MS, verticalSpeedMs: 0, pitchRad: 0.
 const lift = fp.calculateAero(airborne, c172);
 assert.ok(lift.liftN > 0 && lift.dragN > 0 && lift.thrustN > 0);
 assert.ok(fp.airDensity(3000) < fp.airDensity(0));
+const northWind = fp.windComponents(0, 10);
+const westWind = fp.windComponents(270, 10);
+assert.ok(Math.abs(northWind.zMs - 10 * fp.KNOT_TO_MS) < 1e-9 && Math.abs(northWind.xMs) < 1e-9, 'wind direction is interpreted as where wind comes from');
+assert.ok(Math.abs(westWind.xMs - 10 * fp.KNOT_TO_MS) < 1e-9 && Math.abs(westWind.zMs) < 1e-9, 'west wind travels east');
+const tailwind = fp.groundVelocity(100, 0, 0, { xMs: 0, zMs: -10 * fp.KNOT_TO_MS }, false);
+const headwind = fp.groundVelocity(100, 0, 0, { xMs: 0, zMs: 10 * fp.KNOT_TO_MS }, false);
+const crosswind = fp.groundVelocity(100, 0, 0, { xMs: 10 * fp.KNOT_TO_MS, zMs: 0 }, false);
+const parkedInWind = fp.groundVelocity(0, 0, 0, northWind, true);
+assert.ok(tailwind.groundSpeedKts > headwind.groundSpeedKts, 'tailwind increases and headwind decreases groundspeed');
+assert.ok(crosswind.xMs > 0 && crosswind.groundSpeedKts > 100, 'crosswind drifts the ground track');
+assert.equal(parkedInWind.groundSpeedKts, 0, 'wind does not move a parked aircraft');
 assert.ok(fp.calculateAero({ ...airborne, altitudeM: 5000 }, c172).liftN < lift.liftN);
 assert.ok(fp.calculateAero({ ...airborne, flaps: 1 }, c172).liftN > lift.liftN);
 assert.ok(fp.calculateAero({ ...airborne, gearDown: true }, c172).dragN > fp.calculateAero({ ...airborne, gearDown: false }, c172).dragN);

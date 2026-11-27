@@ -212,6 +212,7 @@
     <div title="空速 (Knots)">
       <span class="text-slate-400 text-[10px]">IAS</span>
       <span id="hudSpd" class="font-bold text-sky-300 ml-0.5">0</span><span class="text-[10px] text-slate-400">kt</span>
+      <span class="text-[9px] text-emerald-200 ml-1" title="地速（含風的地面移動速度）">GS <span id="hudGroundSpeed">0</span></span>
     </div>
     <div title="海拔高度 (英尺 / 公尺)">
       <span class="text-slate-400 text-[10px]">ALT</span>
@@ -590,8 +591,19 @@
       </div>
 
       <div class="mb-4">
+        <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider mb-2">3. 風向與陣風</label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <label class="text-[11px] text-slate-300">風向（風從哪裡吹來，°）<input id="windDirection" type="number" min="0" max="359" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
+          <label class="text-[11px] text-slate-300">平均風速（kt）<input id="windSpeed" type="number" min="0" max="50" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
+          <label class="text-[11px] text-slate-300">陣風變化（± kt）<input id="windGust" type="number" min="0" max="15" step="1" class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white" inputmode="numeric"></label>
+        </div>
+        <div id="windStatus" class="mt-2 rounded-lg border border-sky-900/70 bg-slate-900/70 px-3 py-2 text-[11px] text-sky-200" aria-live="polite"></div>
+        <p class="mt-1 text-[10px] text-slate-400">風與簡化的週期陣風只影響空中地速和地面航跡；不代表完整的風切、亂流或大氣模型。設定會保存在此瀏覽器。</p>
+      </div>
+
+      <div class="mb-4">
         <div class="flex items-center justify-between mb-2">
-          <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider">3. 三合一操控模式 (支援自由排版與自定義按鍵)</label>
+          <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider">4. 三合一操控模式 (支援自由排版與自定義按鍵)</label>
           <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
             <input type="checkbox" id="chkInvertY" class="accent-sky-500 rounded cursor-pointer" />
             <span>反轉垂直軸 (Invert Y)</span>
@@ -672,6 +684,7 @@
       const STORAGE_KEY_LAYOUT = 'flightSimPro_customLayout_v2';
       const STORAGE_KEY_KEYS = 'flightSimPro_customKeys_v2';
       const STORAGE_KEY_GAMEPAD = 'flightSimPro_gamepad_v1';
+      const STORAGE_KEY_WIND = 'flightSimPro_wind_v1';
 
       // 13 個獨立可自由拖曳/縮放/透明度控制項定義
       const WIDGET_META = {
@@ -737,6 +750,25 @@
         return {};
       }
       const embeddedPrefs = loadEmbeddedPrefs();
+
+      function normalizeWindSettings(value) {
+        const input = value || {};
+        const direction = Number(input.directionDeg);
+        const speed = Number(input.speedKts);
+        const gust = Number(input.gustKts);
+        return {
+          directionDeg: ((Math.round(Number.isFinite(direction) ? direction : 0) % 360) + 360) % 360,
+          speedKts: THREE.MathUtils.clamp(Number.isFinite(speed) ? speed : 0, 0, 50),
+          gustKts: THREE.MathUtils.clamp(Number.isFinite(gust) ? gust : 0, 0, 15)
+        };
+      }
+      function loadWindSettings() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY_WIND);
+          return normalizeWindSettings(raw ? JSON.parse(raw) : embeddedPrefs.wind);
+        } catch (e) { return normalizeWindSettings(embeddedPrefs.wind); }
+      }
+      const windSettings = loadWindSettings();
 
       function loadGamepadSettings() {
         try {
@@ -861,6 +893,8 @@
 
       const state = {
         balance: 120000, selectedAircraft: 'prop', depCode: 'TPE', arrCode: 'HUN',
+        windDirectionDeg: windSettings.directionDeg, windSpeedKts: windSettings.speedKts, windGustKts: windSettings.gustKts,
+        groundSpeedKts: 0, windClockSec: 0,
         controlMode: isNarrowTouchDevice ? 'mobile' : 'desktop',
         cameraMode: 'cockpit', gamepadUiTimer: 0, gamepadButtonsDown: {},
         invertY: false, gyroEnabled: false, gyroBaseBeta: null, gyroBaseGamma: null,
@@ -2115,6 +2149,32 @@
         return { dep, arr, distKm, fuelMaxRangeKm, bearingDeg, cruiseAltM, cruiseAltFt, etaMin, basePay };
       }
 
+      function getWindVectorAtTime(timeSeconds = state.windClockSec) {
+        const gustOffsetKts = Math.sin((Math.PI * 2 * timeSeconds) / 18) * state.windGustKts;
+        const gustSpeedKts = Math.max(0, state.windSpeedKts + gustOffsetKts);
+        return FlightPhysics.windComponents(state.windDirectionDeg, gustSpeedKts);
+      }
+
+      function updateWindControlsUI() {
+        document.getElementById('windDirection').value = state.windDirectionDeg;
+        document.getElementById('windSpeed').value = state.windSpeedKts;
+        document.getElementById('windGust').value = state.windGustKts;
+        document.getElementById('windStatus').textContent = '風自 ' + String(state.windDirectionDeg).padStart(3, '0') + '°，平均 ' + state.windSpeedKts + ' kt，陣風週期變化 ±' + state.windGustKts + ' kt；空中地速 ' + Math.round(state.groundSpeedKts) + ' kt';
+      }
+
+      function saveWindSettings() {
+        const normalized = normalizeWindSettings({
+          directionDeg: document.getElementById('windDirection').value,
+          speedKts: document.getElementById('windSpeed').value,
+          gustKts: document.getElementById('windGust').value
+        });
+        state.windDirectionDeg = normalized.directionDeg;
+        state.windSpeedKts = normalized.speedKts;
+        state.windGustKts = normalized.gustKts;
+        try { localStorage.setItem(STORAGE_KEY_WIND, JSON.stringify(normalized)); } catch (e) {}
+        updateWindControlsUI();
+      }
+
       function placeAircraftOnRunway(ap) {
         const spec = AIRCRAFT_SPECS[state.selectedAircraft];
         const hdgRad = ap.rwyHeading * Math.PI / 180;
@@ -2125,7 +2185,7 @@
         state.pos.set(ap.x + dirX * startOffset, (ap.groundY || 0) + spec.eyeHeight, ap.z + dirZ * startOffset);
         state.heading = hdgRad; state.pitch = 0; state.roll = 0; state.speed = 0; state.vsFpm = 0; state.verticalSpeedMs = 0; state.flaps = 0; state.stallWarning = false;
         state.throttle = 0; state.rudder = 0; state.brake = false; state.gearDown = true; state.gearAnim = 1.0;
-        state.onGround = true; state.liftoffGraceTimer = 0; state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
+        state.onGround = true; state.liftoffGraceTimer = 0; state.groundSpeedKts = 0; state.windClockSec = 0; state.autopilot = false; state.apPhase = 'OFF'; state.autoLandRequested = false; state.autoLandCaptured = false; state.autoLandFinalCaptured = false; state.autoLandRunwayReverse = false;
         state.unpoweredDive = false; state.diveRecoveryHold = 0; state.diveTimer = 0;
         state.birdStruck = false; state.inStormCell = false; state.windShearCooldown = 0; state.autoTimeCycleTimer = 0; state.lastAnnouncedKmBracket = 9999; state.keys = {};
 
@@ -2689,10 +2749,10 @@
           }
         }
 
+        state.windClockSec += rawDt;
         const effectiveThr = (state.unpoweredDive || state.fuelPct <= 0) ? 0 : state.throttle;
-        const gammaForFuel = Math.atan2(state.verticalSpeedMs, Math.max(2, state.speed * FlightPhysics.KNOT_TO_MS));
-        const forwardSpeedWorldForFuel = state.speed * 0.05144 * Math.cos(gammaForFuel);
-        const distFlownKm = forwardSpeedWorldForFuel * dt * WORLD_TO_KM;
+        const fuelVelocity = FlightPhysics.groundVelocity(state.speed, state.heading, state.verticalSpeedMs, getWindVectorAtTime(), state.onGround);
+        const distFlownKm = Math.hypot(fuelVelocity.xMs, fuelVelocity.zMs) * dt / 1000;
 
         if (distFlownKm > 0 && state.fuelRemainingKm > 0) {
           const burnMultiplier = effectiveThr <= 0.005 ? 0.04 : (effectiveThr / 0.78);
@@ -2763,10 +2823,10 @@
           }
         }
 
-        const gammaForMovement = Math.atan2(state.verticalSpeedMs, Math.max(2, state.speed * FlightPhysics.KNOT_TO_MS));
-        const forwardSpeedWorld = state.speed * 0.05144 * Math.cos(gammaForMovement);
-        state.pos.x += Math.sin(state.heading) * forwardSpeedWorld * dt;
-        state.pos.z += -Math.cos(state.heading) * forwardSpeedWorld * dt;
+        const groundVelocity = FlightPhysics.groundVelocity(state.speed, state.heading, state.verticalSpeedMs, getWindVectorAtTime(), state.onGround);
+        state.groundSpeedKts = groundVelocity.groundSpeedKts;
+        state.pos.x += groundVelocity.xMs * dt * M_TO_WORLD;
+        state.pos.z += groundVelocity.zMs * dt * M_TO_WORLD;
         const targetGear = state.gearDown ? 1.0 : 0.0;
         state.gearAnim += (targetGear - state.gearAnim) * Math.min(1, 3.5 * dt);
 
@@ -2971,6 +3031,7 @@
         document.getElementById('hudDistKm').textContent = distKm.toFixed(1);
         document.getElementById('hudDestBearing').textContent = `${String(destBearingDeg).padStart(3, '0')}°`;
         document.getElementById('hudSpd').textContent = Math.round(state.speed);
+        document.getElementById('hudGroundSpeed').textContent = Math.round(state.groundSpeedKts);
         document.getElementById('hudAltFt').textContent = altFeet.toLocaleString();
         document.getElementById('hudAltM').textContent = altMeters.toLocaleString();
         document.getElementById('hudHdg').textContent = `${String(hdgDeg).padStart(3, '0')}°`;
@@ -3845,6 +3906,8 @@
 
       document.getElementById('selDep').addEventListener('change', (e) => { state.depCode = e.target.value; refreshRouteSummary(); });
       document.getElementById('selArr').addEventListener('change', (e) => { state.arrCode = e.target.value; refreshRouteSummary(); });
+      ['windDirection', 'windSpeed', 'windGust'].forEach(id => document.getElementById(id).addEventListener('change', saveWindSettings));
+      updateWindControlsUI();
       document.getElementById('btnQuickTakeoff').addEventListener('click', beginTakeoffRunDirectly);
       document.getElementById('btnStartMission').addEventListener('click', startMissionWithBoarding);
       document.getElementById('btnTaxiStart').addEventListener('click', startTaxiwayPractice);
@@ -3861,7 +3924,7 @@
         try {
           const prefsScript = document.getElementById('embeddedUserPrefs');
           if (prefsScript) {
-            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds, gamepad: gamepadSettings });
+            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds, gamepad: gamepadSettings, wind: { directionDeg: state.windDirectionDeg, speedKts: state.windSpeedKts, gustKts: state.windGustKts } });
           }
           const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
           const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
