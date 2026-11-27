@@ -11,8 +11,13 @@ const html = read('index.html');
 assert.ok(exists('index.html'), 'root index.html is missing');
 assert.ok(exists('.nojekyll'), '.nojekyll is missing');
 assert.ok(exists('flight-physics.js'), 'flight physics module is missing');
+assert.ok(exists('gamepad-controls.js'), 'gamepad controls module is missing');
 assert.match(html, /<meta[^>]+name=["']viewport["']/i, 'mobile viewport metadata is missing');
 assert.match(html, /<script\s+src=["']\.\/flight-physics\.js["']/i, 'flight physics script must use a relative path');
+assert.match(html, /<script\s+src=["']\.\/gamepad-controls\.js["']/i, 'gamepad module must use a relative path');
+assert.ok(html.includes('id="btnCameraView"'), 'camera view control is missing');
+assert.ok(html.includes('id="btnOpenGamepadSettings"'), 'controller settings button is missing');
+assert.ok(html.includes('data-gp-axis="roll"') && html.includes('data-gp-axis="throttle"'), 'configurable axis selectors are missing');
 assert.ok(html.includes("fetch('./data/taiwan-map.json'"), 'map JSON request must be relative to the project path');
 assert.ok(html.includes("fetch('./data/terrain20m/index.json'"), 'terrain index request must be relative to the project path');
 assert.ok(html.includes('`./data/terrain20m/${record.file}`'), 'terrain tile request must be relative to the project path');
@@ -62,6 +67,9 @@ for (const tile of terrain.tiles) {
 assert.ok(exists('data/airport-runway-sources.md'), 'runway data provenance document is missing');
 assert.match(html, /rwyLen:\s*3660\s*\*\s*M_TO_WORLD/);
 assert.match(html, /rwyWidth:\s*60\s*\*\s*M_TO_WORLD/);
+for (const [code, heading, length, width] of [['RMQ','176.69','3659','61'],['HUN','26.32','2751','45'],['MZG','18.22','3000','45'],['TTT','38.64','2438','45'],['KHH','91.90','3150','60']]) {
+  assert.match(html, new RegExp(`code: '${code}'.*rwyHeading: ${heading}, rwyLen: ${length} \\* M_TO_WORLD, rwyWidth: ${width} \\* M_TO_WORLD`), `runway values for ${code} changed unexpectedly`);
+}
 assert.ok(html.includes('id="btnTaxiStart"'), 'optional ground taxi practice button is missing');
 assert.match(html, /function startTaxiwayPractice\(\)/, 'taxi practice action is not wired');
 assert.ok(html.includes('沿黃色中心線前進'), 'taxi practice instructions are missing');

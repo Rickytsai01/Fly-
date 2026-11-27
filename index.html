@@ -239,6 +239,7 @@
   <div id="widget-systemBtns" data-widget-id="systemBtns" class="custom-widget hud-widget glass rounded-xl px-2 py-1 flex items-center gap-1 text-xs">
     <button id="btnSimSpeed" class="btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-amber-300 mono cursor-pointer" title="切換飛行時間倍速">⏩ 1x</button>
     <button id="btnAutopilot" class="btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-300 cursor-pointer" title="智慧相位阻尼定高自動駕駛">🤖 AP 關</button><button id="btnAutoLand" class="btn-sim px-2 py-1 rounded-lg bg-emerald-700/90 border border-emerald-400/60 font-bold text-white cursor-pointer" title="啟動完整自動降落">🛬 AUTO LAND</button>
+    <button id="btnCameraView" class="btn-sim px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 font-bold text-slate-200 cursor-pointer" title="切換座艙與追機視角">👁️ 座艙</button>
     <button id="btnHudCustom" class="btn-sim px-2 py-1 rounded-lg bg-amber-600/90 hover:bg-amber-500 border border-amber-300/60 font-bold text-white cursor-pointer" title="自由拖曳控制位置或自定義鍵盤按鍵">🎛️ 排版/按鍵</button>
     <button id="btnRadio" class="btn-sim px-2 py-1 rounded-lg bg-fuchsia-700/90 hover:bg-fuchsia-600 border border-fuchsia-400/60 font-bold text-white cursor-pointer" title="開啟 YouTube 音樂電台">📻 電台</button><button id="btnOpenMenu" class="btn-sim px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold shadow cursor-pointer">☰ 選單</button>
   </div>
@@ -602,6 +603,40 @@
           <button data-ctrl="gamepad" class="ctrl-mode-btn btn-sim py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-xs font-bold text-slate-300">🕹️ 外接手把 / 搖桿</button>
         </div>
         <div id="ctrlGuideText" class="mt-2 text-[11px] text-slate-300 bg-slate-900/60 rounded-lg px-3 py-2 border border-slate-800 leading-relaxed"></div>
+        <button id="btnOpenGamepadSettings" type="button" class="hidden mt-2 px-3 py-2 rounded-lg bg-indigo-700/80 hover:bg-indigo-600 text-white text-xs font-bold">🎛️ 控制器設定與軸向測試</button>
+        <div id="gamepadSettingsPanel" class="hidden mt-2 rounded-xl border border-indigo-400/40 bg-slate-950/90 p-3 text-xs text-slate-200">
+          <div class="flex items-center justify-between gap-2 mb-2"><strong class="text-indigo-200">Gamepad 設定、校正與測試</strong><span id="gamepadStatus" class="text-[10px] text-amber-200">等待控制器</span></div>
+          <label class="block mb-2">裝置 <select id="gpDeviceSelect" class="ml-1 rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"><option value="-1">自動選擇</option></select></label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <label>滾轉軸<select data-gp-axis="roll" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>俯仰軸<select data-gp-axis="pitch" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>偏航軸<select data-gp-axis="yaw" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>油門軸<select data-gp-axis="throttle" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>煞車軸<select data-gp-axis="brake" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>油門範圍<select id="gpThrottleMode" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"><option value="signed">-1 到 +1</option><option value="unipolar">0 到 +1</option></select></label>
+            <label>煞車範圍<select id="gpBrakeMode" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"><option value="signed">-1 到 +1</option><option value="unipolar">0 到 +1</option></select></label>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-2 text-[11px]">
+            <label><input type="checkbox" data-gp-invert="roll" class="accent-indigo-400">反轉滾轉</label>
+            <label><input type="checkbox" data-gp-invert="pitch" class="accent-indigo-400">反轉俯仰</label>
+            <label><input type="checkbox" data-gp-invert="yaw" class="accent-indigo-400">反轉偏航</label>
+            <label><input type="checkbox" data-gp-invert="throttle" class="accent-indigo-400">反轉油門</label>
+            <label><input type="checkbox" data-gp-invert="brake" class="accent-indigo-400">反轉煞車</label>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            <label>死區 <span id="gpDeadzoneValue">8%</span><input id="gpDeadzone" type="range" min="0" max="0.35" step="0.01" class="w-full"></label>
+            <label>靈敏度 <span id="gpSensitivityValue">1.00x</span><input id="gpSensitivity" type="range" min="0.35" max="2.5" step="0.05" class="w-full"></label>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+            <label>襟翼按鈕<select data-gp-button="toggleFlaps" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>起落架按鈕<select data-gp-button="toggleGear" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>自動駕駛按鈕<select data-gp-button="toggleAp" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+            <label>視角按鈕<select data-gp-button="cycleView" class="w-full rounded bg-slate-900 border border-slate-600 px-2 py-1 text-white"></select></label>
+          </div>
+          <div class="mt-2 font-mono text-[10px] text-slate-300"><div>即時軸向：<span id="gamepadAxisReadout">--</span></div><div class="mt-1">按下按鈕：<span id="gamepadButtonReadout">--</span></div></div>
+          <div class="flex flex-wrap gap-2 mt-2"><button id="btnCalibrateGamepad" type="button" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600">記錄目前中立點</button><button id="btnResetGamepad" type="button" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">恢復預設</button></div>
+          <p class="mt-2 text-[10px] text-slate-400">校正前請放開所有搖桿；裝置、軸、按鈕、中心點、死區與靈敏度會保存在此瀏覽器。</p>
+        </div>
       </div>
 
       <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
@@ -622,6 +657,7 @@
   </div>
 
   <script src="./flight-physics.js"></script>
+  <script src="./gamepad-controls.js"></script>
   <script id="embeddedUserPrefs" type="application/json">{}</script>
 
   <script>
@@ -635,6 +671,7 @@
 
       const STORAGE_KEY_LAYOUT = 'flightSimPro_customLayout_v2';
       const STORAGE_KEY_KEYS = 'flightSimPro_customKeys_v2';
+      const STORAGE_KEY_GAMEPAD = 'flightSimPro_gamepad_v1';
 
       // 13 個獨立可自由拖曳/縮放/透明度控制項定義
       const WIDGET_META = {
@@ -653,7 +690,7 @@
         throttleWrap: { name: '節流閥滑桿與快選', group: 'touch', xPct: 90, yPct: 84,   scale: 1, opacity: 1 }
       };
 
-      // 16 項可自定義按鍵動作定義
+      // 18 項可自定義按鍵動作定義
       const KEY_ACTION_DEFS = [
         { id: 'throttleUp',    label: '增加油門推力 (Throttle Up)',     defaults: ['KeyW', 'ShiftLeft'] },
         { id: 'throttleDown',  label: '減少油門推力 (Throttle Down)',   defaults: ['KeyS', 'ControlLeft'] },
@@ -670,6 +707,7 @@
         { id: 'toggleGear',    label: '收放起落架 (Toggle Gear)',       defaults: ['KeyG', ''] },
         { id: 'toggleFlaps',   label: '襟翼檔位 (Cycle Flaps)',            defaults: ['KeyF', ''] },
         { id: 'toggleAp',      label: '切換定高自動駕駛 (Autopilot)',   defaults: ['KeyP', ''] },
+        { id: 'cycleView',     label: '切換座艙 / 追機視角',            defaults: ['KeyV', ''] },
         { id: 'cycleSimSpeed', label: '切換飛行時間倍速 (1x/2x/4x)',    defaults: ['Tab', ''] },
         { id: 'toggleMenu',    label: '開啟 / 關閉主選單 (Menu)',       defaults: ['Escape', ''] }
       ];
@@ -699,6 +737,18 @@
         return {};
       }
       const embeddedPrefs = loadEmbeddedPrefs();
+
+      function loadGamepadSettings() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY_GAMEPAD);
+          const saved = raw ? JSON.parse(raw) : embeddedPrefs.gamepad;
+          return GamepadControls.normalizeProfile(saved || GamepadControls.createDefaultProfile());
+        } catch (e) { return GamepadControls.createDefaultProfile(); }
+      }
+      let gamepadSettings = loadGamepadSettings();
+      function saveGamepadSettings() {
+        try { localStorage.setItem(STORAGE_KEY_GAMEPAD, JSON.stringify(gamepadSettings)); } catch (e) {}
+      }
 
       function createDefaultLayoutState() {
         const widgets = {};
@@ -812,6 +862,7 @@
       const state = {
         balance: 120000, selectedAircraft: 'prop', depCode: 'TPE', arrCode: 'HUN',
         controlMode: isNarrowTouchDevice ? 'mobile' : 'desktop',
+        cameraMode: 'cockpit', gamepadUiTimer: 0, gamepadButtonsDown: {},
         invertY: false, gyroEnabled: false, gyroBaseBeta: null, gyroBaseGamma: null,
         isPaused: false, isLayoutEditing: false, selectedWidgetId: 'joyZone',
         phase: 'MENU', simSpeed: 1, autopilot: false, apPhase: 'OFF', cruiseAltM: 1200,
@@ -2340,20 +2391,22 @@
         } else if (state.controlMode === 'mobile') {
           rollInput += state.joyX * 1.15;
           inputPitch += (state.invertY ? -state.joyY : state.joyY) * 1.15;
-        } else if (state.controlMode === 'gamepad' && navigator.getGamepads) {
-          const gps = navigator.getGamepads();
-          const gp = gps && (gps[0] || gps[1] || gps[2] || gps[3]);
+        } else if (state.controlMode === 'gamepad') {
+          const pads = getConnectedGamepads();
+          const gp = getActiveGamepad(pads);
           if (gp) {
-            const ax0 = Math.abs(gp.axes[0]) > 0.08 ? gp.axes[0] : 0;
-            const ax1 = Math.abs(gp.axes[1]) > 0.08 ? gp.axes[1] : 0;
-            const ax2 = gp.axes.length > 2 && Math.abs(gp.axes[2]) > 0.08 ? gp.axes[2] : 0;
-            rollInput += ax0;
-            inputPitch += (state.invertY ? -ax1 : ax1);
-            yawInput += ax2;
-            if (!state.unpoweredDive && state.fuelPct > 0 && gp.axes.length > 3) {
-              const thrAxis = (1 - gp.axes[3]) * 0.5;
-              if (thrAxis >= 0 && thrAxis <= 1) state.throttle = thrAxis;
-            }
+            rollInput += GamepadControls.readAxis(gp, gamepadSettings, 'roll') * 1.15;
+            const pitchAxis = GamepadControls.readAxis(gp, gamepadSettings, 'pitch');
+            inputPitch += (state.invertY ? -pitchAxis : pitchAxis) * 1.15;
+            yawInput += GamepadControls.readAxis(gp, gamepadSettings, 'yaw');
+            const throttleInput = GamepadControls.readThrottle(gp, gamepadSettings);
+            if (!state.unpoweredDive && state.fuelPct > 0 && throttleInput !== null) state.throttle = throttleInput;
+            const brakeInput = GamepadControls.readBrake(gp, gamepadSettings);
+            if (brakeInput !== null) state.brake = brakeInput >= 0.55;
+            processGamepadButtonActions(gp);
+          } else {
+            state.gamepadButtonsDown = {};
+            if (gamepadSettings.axes.brake >= 0) state.brake = false;
           }
         }
 
@@ -2761,9 +2814,24 @@
           return;
         }
 
-        camera.position.copy(state.pos);
-        const euler = new THREE.Euler(state.pitch, -state.heading, -state.roll, 'YXZ');
-        camera.quaternion.setFromEuler(euler);
+        const planeBaseY = state.pos.y - spec.eyeHeight + 0.05;
+        worldPlaneGroup.position.set(state.pos.x, planeBaseY, state.pos.z);
+        worldPlaneGroup.rotation.set(state.pitch, -state.heading, -state.roll);
+        if (state.cameraMode === 'chase') {
+          cockpitGroup.visible = false;
+          worldPlaneGroup.visible = true;
+          const chaseDistance = spec.id === 'boeing' ? 17 : 9;
+          const chaseOffset = new THREE.Vector3(0, Math.max(2.6, spec.eyeHeight * 2), chaseDistance)
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), -state.heading);
+          camera.position.copy(state.pos).add(chaseOffset);
+          camera.lookAt(state.pos.x, planeBaseY + 0.35, state.pos.z);
+        } else {
+          cockpitGroup.visible = true;
+          worldPlaneGroup.visible = false;
+          camera.position.copy(state.pos);
+          const euler = new THREE.Euler(state.pitch, -state.heading, -state.roll, 'YXZ');
+          camera.quaternion.setFromEuler(euler);
+        }
 
         const engineOut = state.unpoweredDive || state.fuelPct <= 0;
         if (cockpitProps.propeller) {
@@ -3065,6 +3133,13 @@
         state.flaps = detents[(nearest + 1) % detents.length];
         SoundEngine.playTone(state.flaps > 0 ? 460 : 620, 0.1, 'triangle', 0.18);
         showNavToast(`襟翼設定 ${Math.round(state.flaps * 100)}%`);
+      }
+
+      function cycleCameraView() {
+        state.cameraMode = state.cameraMode === 'cockpit' ? 'chase' : 'cockpit';
+        const button = document.getElementById('btnCameraView');
+        if (button) button.textContent = state.cameraMode === 'cockpit' ? '👁️ 座艙' : '👁️ 追機';
+        showNavToast(state.cameraMode === 'cockpit' ? '視角：座艙' : '視角：追機');
       }
 
       function cycleSimSpeed() {
@@ -3422,6 +3497,7 @@
           if (isActionPressed('toggleGear')) toggleGear();
           if (isActionPressed('toggleFlaps')) cycleFlaps();
           if (isActionPressed('toggleAp')) toggleAutopilot();
+          if (isActionPressed('cycleView')) cycleCameraView();
           if (isActionPressed('cycleSimSpeed')) cycleSimSpeed();
         }
 
@@ -3613,6 +3689,128 @@
         });
       });
 
+      const GAMEPAD_BUTTON_ACTIONS = [
+        { id: 'toggleFlaps', run: cycleFlaps },
+        { id: 'toggleGear', run: toggleGear },
+        { id: 'toggleAp', run: toggleAutopilot },
+        { id: 'cycleView', run: cycleCameraView }
+      ];
+      function getConnectedGamepads() {
+        if (!navigator.getGamepads) return [];
+        try { return Array.from(navigator.getGamepads() || []).filter(pad => pad && pad.connected !== false); } catch (e) { return []; }
+      }
+      function getActiveGamepad(pads = getConnectedGamepads()) {
+        if (gamepadSettings.deviceIndex >= 0) return pads.find(pad => pad.index === gamepadSettings.deviceIndex) || null;
+        return pads[0] || null;
+      }
+      function refreshGamepadDiagnostics() {
+        const pads = getConnectedGamepads();
+        const selected = getActiveGamepad(pads);
+        const status = document.getElementById('gamepadStatus');
+        const axisReadout = document.getElementById('gamepadAxisReadout');
+        const buttonReadout = document.getElementById('gamepadButtonReadout');
+        if (!navigator.getGamepads) {
+          status.textContent = '此瀏覽器不支援 Gamepad API';
+          axisReadout.textContent = '不支援'; buttonReadout.textContent = '不支援'; return;
+        }
+        if (!selected) {
+          status.textContent = pads.length ? '選定的裝置未連線' : '等待連接手把或搖桿';
+          axisReadout.textContent = '--'; buttonReadout.textContent = '--'; return;
+        }
+        status.textContent = `${selected.id}（${selected.axes.length} 軸 / ${selected.buttons.length} 按鈕）`;
+        axisReadout.textContent = selected.axes.map((value, index) => `A${index}:${Number(value).toFixed(2)}`).join('  ') || '無軸';
+        const pressed = selected.buttons.map((button, index) => (button.pressed || button.value > 0.55) ? `B${index}` : '').filter(Boolean);
+        buttonReadout.textContent = pressed.join(' ') || '無按鈕按下';
+      }
+      function refreshGamepadDeviceOptions() {
+        const select = document.getElementById('gpDeviceSelect');
+        if (!select) return;
+        const pads = getConnectedGamepads();
+        select.replaceChildren(new Option('自動選擇第一支已連線裝置', '-1'));
+        pads.forEach(pad => select.add(new Option(`${pad.id} (#${pad.index})`, String(pad.index))));
+        if (gamepadSettings.deviceIndex >= 0 && !pads.some(pad => pad.index === gamepadSettings.deviceIndex)) {
+          select.add(new Option(`裝置索引 ${gamepadSettings.deviceIndex}（未連線）`, String(gamepadSettings.deviceIndex)));
+        }
+        select.value = String(gamepadSettings.deviceIndex);
+        refreshGamepadDiagnostics();
+      }
+      function syncGamepadSettingsUI() {
+        document.querySelectorAll('[data-gp-axis]').forEach(select => { select.value = String(gamepadSettings.axes[select.dataset.gpAxis]); });
+        document.querySelectorAll('[data-gp-invert]').forEach(input => { input.checked = gamepadSettings.invert[input.dataset.gpInvert]; });
+        document.querySelectorAll('[data-gp-button]').forEach(select => { select.value = String(gamepadSettings.buttons[select.dataset.gpButton]); });
+        document.getElementById('gpThrottleMode').value = gamepadSettings.throttleMode;
+        document.getElementById('gpBrakeMode').value = gamepadSettings.brakeMode;
+        document.getElementById('gpDeadzone').value = gamepadSettings.deadzone;
+        document.getElementById('gpSensitivity').value = gamepadSettings.sensitivity;
+        document.getElementById('gpDeadzoneValue').textContent = `${Math.round(gamepadSettings.deadzone * 100)}%`;
+        document.getElementById('gpSensitivityValue').textContent = `${gamepadSettings.sensitivity.toFixed(2)}x`;
+        refreshGamepadDeviceOptions();
+      }
+      function initializeGamepadSettingsUI() {
+        document.querySelectorAll('[data-gp-axis]').forEach(select => {
+          select.add(new Option('停用', '-1'));
+          for (let index = 0; index < 16; index++) select.add(new Option(`Axis ${index}`, String(index)));
+        });
+        document.querySelectorAll('[data-gp-button]').forEach(select => {
+          select.add(new Option('停用', '-1'));
+          for (let index = 0; index < 32; index++) select.add(new Option(`Button ${index}`, String(index)));
+        });
+        const saveFromUi = () => {
+          document.querySelectorAll('[data-gp-axis]').forEach(el => { gamepadSettings.axes[el.dataset.gpAxis] = Number(el.value); });
+          document.querySelectorAll('[data-gp-invert]').forEach(el => { gamepadSettings.invert[el.dataset.gpInvert] = el.checked; });
+          document.querySelectorAll('[data-gp-button]').forEach(el => { gamepadSettings.buttons[el.dataset.gpButton] = Number(el.value); });
+          gamepadSettings.throttleMode = document.getElementById('gpThrottleMode').value;
+          gamepadSettings.brakeMode = document.getElementById('gpBrakeMode').value;
+          gamepadSettings.deadzone = Number(document.getElementById('gpDeadzone').value);
+          gamepadSettings.sensitivity = Number(document.getElementById('gpSensitivity').value);
+          gamepadSettings = GamepadControls.normalizeProfile(gamepadSettings);
+          saveGamepadSettings();
+          document.getElementById('gpDeadzoneValue').textContent = `${Math.round(gamepadSettings.deadzone * 100)}%`;
+          document.getElementById('gpSensitivityValue').textContent = `${gamepadSettings.sensitivity.toFixed(2)}x`;
+        };
+        document.querySelectorAll('[data-gp-axis],[data-gp-invert],[data-gp-button],#gpThrottleMode,#gpBrakeMode,#gpDeadzone,#gpSensitivity').forEach(el => {
+          el.addEventListener('input', saveFromUi); el.addEventListener('change', saveFromUi);
+        });
+        document.getElementById('gpDeviceSelect').addEventListener('change', event => {
+          gamepadSettings.deviceIndex = Number(event.target.value);
+          saveGamepadSettings(); refreshGamepadDiagnostics();
+        });
+        document.getElementById('btnCalibrateGamepad').addEventListener('click', () => {
+          const pad = getActiveGamepad();
+          if (!pad) { showNavToast('請先連接並選取搖桿，再執行中立點校正。'); return; }
+          for (const role of ['roll', 'pitch', 'yaw', 'brake']) {
+            const axis = gamepadSettings.axes[role];
+            if (axis >= 0 && axis < pad.axes.length && (role !== 'brake' || gamepadSettings.brakeMode === 'signed')) gamepadSettings.centers[role] = Number(pad.axes[axis]) || 0;
+          }
+          saveGamepadSettings(); syncGamepadSettingsUI(); showNavToast('✅ 已記錄目前中立軸位置。');
+        });
+        document.getElementById('btnResetGamepad').addEventListener('click', () => {
+          gamepadSettings = GamepadControls.createDefaultProfile();
+          saveGamepadSettings(); syncGamepadSettingsUI(); showNavToast('已還原預設搖桿軸向與按鈕。');
+        });
+        syncGamepadSettingsUI();
+      }
+      function processGamepadButtonActions(pad) {
+        for (const action of GAMEPAD_BUTTON_ACTIONS) {
+          const index = gamepadSettings.buttons[action.id];
+          const button = index >= 0 ? pad.buttons[index] : null;
+          const down = !!button && (button.pressed || button.value > 0.55);
+          if (down && !state.gamepadButtonsDown[action.id] && state.phase === 'FLIGHT' && !state.isLayoutEditing) {
+            SoundEngine.init(); action.run();
+          }
+          state.gamepadButtonsDown[action.id] = down;
+        }
+      }
+
+      window.addEventListener('gamepadconnected', event => {
+        refreshGamepadDeviceOptions();
+        showNavToast(`🎮 已偵測控制器：${event.gamepad.id}`);
+      });
+      window.addEventListener('gamepaddisconnected', () => {
+        state.gamepadButtonsDown = {};
+        refreshGamepadDeviceOptions();
+      });
+
       function applyControlModeUI() {
         document.querySelectorAll('.ctrl-mode-btn').forEach(btn => {
           const active = btn.dataset.ctrl === state.controlMode;
@@ -3621,18 +3819,28 @@
             : 'ctrl-mode-btn btn-sim py-2 px-2 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-xs font-bold text-slate-300';
         });
         const guide = document.getElementById('ctrlGuideText');
+        const gamepadButton = document.getElementById('btnOpenGamepadSettings');
+        gamepadButton.classList.toggle('hidden', state.controlMode !== 'gamepad');
+        if (state.controlMode !== 'gamepad') document.getElementById('gamepadSettingsPanel').classList.add('hidden');
+        refreshGamepadDeviceOptions();
         if (state.controlMode === 'desktop') {
           guide.innerHTML = `🖥️ <strong>電腦鍵鼠模式（已套用您的自定義按鍵）：</strong>油門增減 <strong>${getActionDisplayStr('throttleUp')}</strong> / <strong>${getActionDisplayStr('throttleDown')}</strong>（MAX: <strong>${getActionDisplayStr('throttleMax')}</strong>），拉桿抬頭 <strong>${getActionDisplayStr('pitchUp')}</strong> 或滑鼠往下拉，方向舵 <strong>${getActionDisplayStr('yawLeft')}</strong> / <strong>${getActionDisplayStr('yawRight')}</strong>，煞車 <strong>${getActionDisplayStr('toggleBrake')}</strong>，起落架 <strong>${getActionDisplayStr('toggleGear')}</strong>，自動駕駛 <strong>${getActionDisplayStr('toggleAp')}</strong>。`;
         } else if (state.controlMode === 'mobile') {
           guide.innerHTML = '📱 <strong>手機觸控模式：</strong>所有螢幕按鈕皆可透過上方「🎛️ 自由拖曳排版」隨意移動位置、調整大小與透明度！';
         } else {
-          guide.innerHTML = '🕹️ <strong>外接手把 / 搖桿：</strong>連接 USB / 藍牙手把並撥動任意按鍵喚醒瀏覽器 Gamepad API（左搖桿俯仰滾轉、右搖桿偏航與油門軸）。';
+          guide.innerHTML = '🕹️ <strong>外接搖桿：</strong>在「控制器設定」偵測裝置、選擇軸向、校正中立點，並測試按鍵。預設座艙/追機視角按鍵：<strong>' + getActionDisplayStr('cycleView') + '</strong>。';
         }
         updateControlVisibility();
       }
 
       document.querySelectorAll('.ctrl-mode-btn').forEach(btn => {
         btn.addEventListener('click', () => { state.controlMode = btn.dataset.ctrl; applyControlModeUI(); });
+      });
+      initializeGamepadSettingsUI();
+      document.getElementById('btnOpenGamepadSettings').addEventListener('click', () => {
+        const panel = document.getElementById('gamepadSettingsPanel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) refreshGamepadDeviceOptions();
       });
 
       document.getElementById('selDep').addEventListener('change', (e) => { state.depCode = e.target.value; refreshRouteSummary(); });
@@ -3646,13 +3854,14 @@
       document.getElementById('btnResNext').addEventListener('click', () => { document.getElementById('resultModal').classList.add('hidden'); openMenuModal(); });
       document.getElementById('btnSimSpeed').addEventListener('click', () => { if (!state.isLayoutEditing) cycleSimSpeed(); });
       document.getElementById('btnAutopilot').addEventListener('click', () => { if (!state.isLayoutEditing) toggleAutopilot(); });
+      document.getElementById('btnCameraView').addEventListener('click', () => { if (!state.isLayoutEditing) cycleCameraView(); });
 
       // 下載離線版 HTML 時，將自訂排版與按鍵一併寫入檔案中
       document.getElementById('btnDownloadOffline').addEventListener('click', () => {
         try {
           const prefsScript = document.getElementById('embeddedUserPrefs');
           if (prefsScript) {
-            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds });
+            prefsScript.textContent = JSON.stringify({ layout: userLayout, keybinds: userKeybinds, gamepad: gamepadSettings });
           }
           const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
           const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -3981,6 +4190,8 @@
         lastFrameTime = now;
         const strobeOn = (Math.floor(now / 280) % 2) === 0;
         cloudUniforms.uTime.value=now*0.00012;
+        state.gamepadUiTimer += rawDt;
+        if (state.gamepadUiTimer >= 0.25) { state.gamepadUiTimer = 0; refreshGamepadDiagnostics(); }
         skyDisplay.position.copy(camera.position);
         cloudDisplay.position.copy(camera.position);
         if(solarGlare.visible){
